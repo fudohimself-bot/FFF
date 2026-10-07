@@ -45,6 +45,13 @@ def dump_scene():
                 "bones": bones,
             })
         elif obj.type == "MESH":
+            # How many vertices each group really moves (weight above zero); empty groups are left out.
+            weighted = {}
+            names = {g.index: g.name for g in obj.vertex_groups}
+            for v in obj.data.vertices:
+                for ge in v.groups:
+                    if ge.weight > 0.0 and ge.group in names:
+                        weighted[names[ge.group]] = weighted.get(names[ge.group], 0) + 1
             out["meshes"].append({
                 "object": obj.name,
                 "vertices": len(obj.data.vertices),
@@ -53,6 +60,7 @@ def dump_scene():
                 "location": r4(obj.location),
                 "scale": r4(obj.scale),
                 "vertex_groups": [g.name for g in obj.vertex_groups],
+                "weighted_vertex_counts": weighted,
                 "materials": [m.name if m else None for m in obj.data.materials],
                 "parent": obj.parent.name if obj.parent else None,
                 "modifiers": [m.type for m in obj.modifiers],

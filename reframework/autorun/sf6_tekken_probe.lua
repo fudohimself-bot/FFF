@@ -13,11 +13,11 @@ local HOOKS = {
     },
     ["access"] = "r",
     ["value_type"] = "int",
-    ["purpose"] = "Detect a new round so per-round state resets",
+    ["purpose"] = "Detect a new round so per-round state resets (not reliable alone: see evidence)",
     ["source"] = "SF6_replay_capture: gBattle.Round.RoundNo",
     ["read_verified"] = true,
     ["write_verified"] = "n/a",
-    ["evidence"] = "Probe 2026-10-07: read 0 in an offline match"
+    ["evidence"] = "Probe 2026-10-07: read 0. In-game panel showed 'round 0' in both round 1 and a later round, so it does not reliably change between rounds; the mod also resets when stage_timer jumps back by more than 30."
   },
   {
     ["id"] = "stage_timer",

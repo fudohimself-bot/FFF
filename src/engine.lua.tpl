@@ -31,6 +31,16 @@ local function round_half_up(x)
     return math.floor(x + 0.5)
 end
 
+-- Debug switches for testing in the real game without having to get low on health or press the key.
+Engine.debug = { force_rage = { [0] = false, [1] = false } }
+
+function Engine.start_heat(st, i)
+    local p = st.p[i]
+    local heat = MECH.heat
+    p.heat_until = st.tick + heat.duration_ticks
+    p.heat_ready_at = p.heat_until + heat.cooldown_ticks
+end
+
 function Engine.heat_active(st, i)
     return st.tick < st.p[i].heat_until
 end
@@ -39,7 +49,10 @@ end
 function Engine.step(st, snap)
     local writes = {}
 
-    if snap.round ~= st.round then
+    -- A new round: the game's round number changed, OR the match timer jumped backwards
+    -- (probe screenshots showed the round number reading 0 in a later round, so it can't be relied on alone).
+    local timer_jumped_back = st.last_timer ~= nil and snap.timer < st.last_timer - 30
+    if snap.round ~= st.round or timer_jumped_back then
         st.round = snap.round
         st.last_timer = nil
         st.tick = 0
@@ -67,8 +80,7 @@ function Engine.step(st, snap)
             local p = st.p[i]
             local down = snap.keys[i] == true
             if down and not p.key_prev and st.tick >= p.heat_ready_at and not Engine.heat_active(st, i) then
-                p.heat_until = st.tick + heat.duration_ticks
-                p.heat_ready_at = p.heat_until + heat.cooldown_ticks
+                Engine.start_heat(st, i)
             end
             p.key_prev = down
         end
@@ -118,6 +130,7 @@ function Engine.step(st, snap)
         else
             p.rage = false
         end
+        if Engine.debug.force_rage[i] and enabled("rage") then p.rage = true end
         p.last_hp = hp[i]
         p.last_guard = snap.guard[i] or 0
     end
@@ -199,6 +212,10 @@ if re ~= nil and sdk ~= nil then
                 local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                 if changed then MECH[id].enabled = value end
             end
+            imgui.text("Debug (for testing only):")
+            local fchanged, fvalue = imgui.checkbox("force P1 Rage on", Engine.debug.force_rage[0])
+            if fchanged then Engine.debug.force_rage[0] = fvalue end
+            if imgui.button("start P1 Heat now (no key)") then Engine.start_heat(state, 0) end
             for i = 0, 1 do
                 imgui.text(string.format("P%d  rage: %s  heat: %s", i + 1,
                     tostring(state.p[i].rage), tostring(Engine.heat_active(state, i))))

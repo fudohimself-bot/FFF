@@ -172,6 +172,40 @@ class EngineRules(unittest.TestCase):
         self.assertEqual(writes, {1: 868})
 
 
+class RoundAndDebug(unittest.TestCase):
+    def setUp(self):
+        self.lua, self.g = load_engine()
+        self.m = Match(self.lua, self.g)
+        self.m.timer = 500
+        self.m.tick()
+
+    def test_timer_jump_back_resets_round_even_if_round_number_is_unchanged(self):
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.assertTrue(self.g.Engine.heat_active(self.m.state, 0))
+        self.m.timer = 3  # new round: timer restarts, RoundNo still reads 1
+        self.m.tick()
+        self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
+
+    def test_small_timer_wobble_does_not_reset(self):
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.m.timer -= 5  # a rollback re-simulation steps back a few ticks
+        self.m.tick()
+        self.assertTrue(self.g.Engine.heat_active(self.m.state, 0))
+
+    def test_debug_force_rage_gives_bonus_at_full_health(self):
+        self.g.Engine.debug.force_rage[0] = True
+        self.m.tick()
+        self.m.hp[1] -= 100
+        self.assertEqual(self.m.tick(), {1: 885})
+
+    def test_debug_start_heat_without_key(self):
+        self.g.Engine.start_heat(self.m.state, 0)
+        self.m.hp[1] -= 100
+        self.assertEqual(self.m.tick(), {1: 885})
+
+
 class RealMaxHealth(unittest.TestCase):
     def setUp(self):
         self.lua, self.g = load_engine()

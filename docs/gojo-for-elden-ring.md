@@ -36,7 +36,15 @@ You do **not** need the Cursed Clash UE5 Mod Kit itself (Unreal Engine 5.1, Visu
 
 1. **Find Gojo in Cursed Clash.** In FModel, add the Cursed Clash folder as a game (Unreal Engine version 5.1) and paste the key into Directory > AES Manager. Characters are under `Content/Characters/CP_###`. **Gojo is `CP_050`** (adult Gojo; `CP_051` is teen Gojo), according to the ID table in [JJK-CC-Resources](https://github.com/MadMax1960/JJK-CC-Resources). Open the `SK_...` skeletal mesh in `CP_050` to check it's him.
 2. **Export Gojo.** In FModel's settings, set the model export format to glTF and textures to PNG. Right-click Gojo's skeletal mesh, choose Save Model, and save his textures too.
-3. **Pick the armor set to replace.** Choose a set you already own in your save (or one you can get early). Tell me its name and I'll give you its file numbers: Elden Ring stores each piece as `parts\hd_m_####.partsbnd.dcx` (head), `bd_m_` (body), `am_m_` (arms) and `lg_m_` (legs).
+3. **Pick the armor set to replace.** Chosen: **the Prisoner set** (the Prisoner class's starting armor). Read from `regulation.bin` (EquipParamProtector) and checked against UXM's file list:
+
+   | Piece | Row | Model | Files in `parts\` |
+   |---|---|---|---|
+   | Prisoner Iron Mask | 890000 | 1410 | `hd_m_1410`, `hd_m_1410_l` |
+   | Prisoner Clothing | 890100 | 1410 | `bd_m_1410`, `bd_m_1410_l`, `bd_f_1410`, `bd_f_1410_l` |
+   | Prisoner Trousers | 890300 | 1410 | `lg_m_1410`, `lg_m_1410_l` |
+
+   All are `.partsbnd.dcx`; `_l` is the low-detail copy the game shows at a distance. The body has separate male and female files, so both get Gojo. The set has no arms piece (no row 890200), so the player's bare arms show; Gojo's sleeves and hands go into the body piece, and step 9 hides the bare arms.
 4. **Unpack Elden Ring** with UXM Selective Unpacker, choosing only the `parts` folder.
 5. **Dump both skeletons.** (Gojo's half is done: his bone list was read straight from the exported `.glb`. Only the Elden Ring half is still needed.) In Blender, import Gojo's `.gltf` into an empty scene, open the Scripting tab, open `tools/blender/dump_armature.py` from this project and press Run Script. It writes `armature_dump_<name>.json` to your Desktop, named after the Blender file, so save each scene first with its own name (for example `gojo.blend` and `eldenring.blend`). Do the same with the body armor piece imported through Soulstruct for Blender. **Send me both files.** They are small text files.
 6. **I write the bone map.** From the two dumps I build a table that says which of Gojo's bones follow which Elden Ring bones, and a Blender script that applies it: renames or merges the vertex groups, fits Gojo to the Elden Ring body's height and pose, and drops bones Elden Ring can't use.

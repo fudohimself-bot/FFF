@@ -160,6 +160,72 @@
       "read_verified": false,
       "write_verified": "n/a",
       "evidence": "Field name seen in the probe's field list. Which bit is which button is unknown: the panel shows the live value so the bits can be decoded."
+    },
+    {
+      "id": "global_speed",
+      "kind": "api",
+      "path_steps": [
+        "via.Application",
+        "set_GlobalSpeed"
+      ],
+      "access": "w",
+      "value_type": "float",
+      "purpose": "Slow the whole game briefly for dramatic moments (Heat Smash or Rage Art landing)",
+      "source": "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
+      "read_verified": "n/a",
+      "write_verified": false,
+      "evidence": "None yet. The panel has a test button; the probe checks the engine type exists."
+    },
+    {
+      "id": "sleep_time",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "sleep_time"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Research: a candidate for the game's hit freeze, to make hits feel weightier",
+      "source": "Fighter field list from the probe; meaning unknown",
+      "read_verified": false,
+      "write_verified": "n/a",
+      "evidence": "Field name seen in the probe's field list; value during a hit not seen yet."
+    },
+    {
+      "id": "damage_sleep",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "damage_sleep"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Research: another candidate for the game's hit freeze",
+      "source": "Fighter field list from the probe; meaning unknown",
+      "read_verified": false,
+      "write_verified": "n/a",
+      "evidence": "Field name seen in the probe's field list; value during a hit not seen yet."
+    },
+    {
+      "id": "hit_stop",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "hit_stop"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Research: the hit freeze field the community replay script reads; it was NOT in the fighter field list, so it may not exist on this object",
+      "source": "SF6_replay_capture reads cPlayer[i].hit_stop",
+      "read_verified": false,
+      "write_verified": "n/a",
+      "evidence": "Not in the probe's field list for the fighter object. The probe will say whether reading it works."
     }
   ]
 }

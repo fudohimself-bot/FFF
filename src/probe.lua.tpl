@@ -8,6 +8,14 @@
 if re ~= nil and sdk ~= nil then
     local report_text = "not run yet"
 
+    -- How to check each api-style hook from the sheet.
+    local API_CHECKS = {
+        key_state = function() return reframework ~= nil and reframework.is_key_down ~= nil end,
+        global_speed = function()
+            return sdk.get_native_singleton("via.Application") ~= nil and sdk.find_type_definition("via.Application") ~= nil
+        end,
+    }
+
     local function describe(v)
         local n = tonumber(v)
         if n ~= nil then return { type = "number", value = n } end
@@ -43,7 +51,15 @@ if re ~= nil and sdk ~= nil then
         for _, hook in ipairs(HOOKS) do
             local entry = { id = hook.id, kind = hook.kind }
             if hook.kind == "api" then
-                entry.ok = (reframework ~= nil and reframework.is_key_down ~= nil)
+                local check = API_CHECKS[hook.id]
+                if check == nil then
+                    entry.ok = false
+                    entry.error = "no check written for this api hook"
+                else
+                    local okc, res = pcall(check)
+                    entry.ok = okc and res == true
+                    if not okc then entry.error = tostring(res) end
+                end
             else
                 local per_player = {}
                 local uses_player = false

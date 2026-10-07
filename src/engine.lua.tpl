@@ -21,7 +21,7 @@ local function new_player()
 end
 
 function Engine.new_state()
-    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, smash_count = 0, art_count = 0, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
+    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, smash_count = 0, art_count = 0, fx = nil, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
 end
 
 local function enabled(id)
@@ -226,6 +226,7 @@ function Engine.step(st, snap)
                 st.p[a].heat_left = 0
                 st.smash_count = st.smash_count + 1
                 st.last_event = string.format("P%d Heat Smash LANDED for %d extra, Heat spent", a + 1, extra)
+                if enabled("slowmo_fx") then st.fx = { scale = MECH.slowmo_fx.fx_speed_scale, frames = MECH.slowmo_fx.fx_frames } end
             end
             if enabled("rage_art") and st.p[a].art_left > 0 and hp[v] > 0 then
                 local extra = round_half_up(st.p[v].max_hp * MECH.rage_art.bonus_pct_of_max / 100.0)
@@ -242,6 +243,7 @@ function Engine.step(st, snap)
                 st.p[a].rage_spent = true
                 st.art_count = st.art_count + 1
                 st.last_event = string.format("P%d Rage Art LANDED for %d extra, Rage spent", a + 1, extra)
+                if enabled("slowmo_fx") then st.fx = { scale = MECH.slowmo_fx.fx_speed_scale, frames = MECH.slowmo_fx.fx_frames } end
             end
         end
     end
@@ -318,6 +320,61 @@ if re ~= nil and sdk ~= nil then
     local last_status = "waiting for a match"
     local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 } }
     local hud = { show = true, error = nil }
+    local fx = { left = 0, error = nil, calls = 0 }
+
+    -- Research readouts: live values of the fields that might be the game's hit freeze.
+    local WATCH = {}
+    for _, id in ipairs({ "sleep_time", "damage_sleep", "hit_stop" }) do
+        for _, h in ipairs(ROWS.hooks) do
+            if h.id == id then
+                WATCH[#WATCH + 1] = { id = id, field = h.path_steps[#h.path_steps],
+                                      now = { [0] = "n/a", [1] = "n/a" }, max = { [0] = 0, [1] = 0 } }
+            end
+        end
+    end
+
+    local function update_watch(players)
+        for _, w in ipairs(WATCH) do
+            for i = 0, 1 do
+                local ok, v = pcall(function() return players[i][w.field] end)
+                local n = ok and v ~= nil and tonumber(v) or nil
+                if n == nil and ok and v ~= nil then n = tonumber(tostring(v)) end
+                if n ~= nil then
+                    w.now[i] = n
+                    if n > w.max[i] then w.max[i] = n end
+                else
+                    w.now[i] = "n/a"
+                end
+            end
+        end
+    end
+
+    -- Global game speed (1.0 = normal). Returns true if the engine accepted the call.
+    local function set_speed(v)
+        local app = sdk.get_native_singleton("via.Application")
+        local t = sdk.find_type_definition("via.Application")
+        sdk.call_native_func(app, t, "set_GlobalSpeed", v)
+        fx.calls = fx.calls + 1
+    end
+
+    local function restore_speed()
+        local ok = pcall(set_speed, 1.0)
+        fx.left = 0
+        return ok
+    end
+
+    local function start_fx(scale, frames)
+        local ok, err = pcall(set_speed, scale)
+        if ok then
+            fx.left = frames
+            fx.error = nil
+        else
+            fx.error = tostring(err)
+            fx.left = 0
+            if MECH.slowmo_fx then MECH.slowmo_fx.enabled = false end  -- the game refused it: stop trying
+            pcall(set_speed, 1.0)
+        end
+    end
 
     local function num(v)
         local n = tonumber(v)
@@ -398,6 +455,20 @@ if re ~= nil and sdk ~= nil then
             last_error = tostring(writes)
             return
         end
+        update_watch(players)
+        -- Slow-motion for big moments: start when the rules ask for it, always hand the speed back afterwards.
+        if state.fx ~= nil then
+            if MECH.slowmo_fx ~= nil and MECH.slowmo_fx.enabled then start_fx(state.fx.scale, state.fx.frames) end
+            state.fx = nil
+        end
+        if fx.left > 0 then
+            if MECH.slowmo_fx == nil or not MECH.slowmo_fx.enabled then
+                restore_speed()
+            else
+                fx.left = fx.left - 1
+                if fx.left == 0 then restore_speed() end
+            end
+        end
         last_status = "running (round " .. tostring(snap.round) .. ")"
         local okh, errh = pcall(draw_hud)
         hud.error = (not okh) and tostring(errh) or nil
@@ -421,6 +492,12 @@ if re ~= nil and sdk ~= nil then
         end
     end)
 
+    if re.on_script_reset ~= nil then
+        re.on_script_reset(function()
+            restore_speed()
+        end)
+    end
+
     re.on_draw_ui(function()
         if imgui.tree_node("SF6 Tekken Mode (offline only)") then
             imgui.text("Status: " .. last_status)
@@ -428,7 +505,7 @@ if re ~= nil and sdk ~= nil then
             imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
             imgui.text(string.format("Chip hits: %d   block timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 state.chip_count, stats.guard_now[0], stats.guard_now[1], stats.guard_max[0], stats.guard_max[1]))
-            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art" }) do
+            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art", "slowmo_fx" }) do
                 if MECH[id] ~= nil then
                     local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                     if changed then MECH[id].enabled = value end
@@ -437,6 +514,10 @@ if re ~= nil and sdk ~= nil then
             imgui.text(string.format("Heat Smashes landed: %d   Rage Arts landed: %d", state.smash_count, state.art_count))
             imgui.text(string.format("Hitstun timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 stats.hit_now[0], stats.hit_now[1], stats.hit_max[0], stats.hit_max[1]))
+            for _, w in ipairs(WATCH) do
+                imgui.text(string.format("Hit-freeze candidate %s: now P1 %s / P2 %s, highest seen P1 %s / P2 %s",
+                    w.field, tostring(w.now[0]), tostring(w.now[1]), tostring(w.max[0]), tostring(w.max[1])))
+            end
             imgui.text(string.format("Held buttons (game bits) P1 %d [%s]  P2 %d [%s]",
                 stats.btn_now[0], bits(stats.btn_now[0]), stats.btn_now[1], bits(stats.btn_now[1])))
             local hchanged, hvalue = imgui.checkbox("show on-screen Heat / Rage readout", hud.show)
@@ -449,6 +530,11 @@ if re ~= nil and sdk ~= nil then
             if imgui.button("start P1 Heat now (no key)") then Engine.start_heat(state, 0) end
             if imgui.button("arm P1 Heat Smash (needs Heat on)") then Engine.arm_smash(state, 0) end
             if imgui.button("arm P1 Rage Art (no key)") then Engine.arm_art(state, 0) end
+            if MECH.slowmo_fx ~= nil and imgui.button("test slow-motion now (about 1 second)") then
+                start_fx(MECH.slowmo_fx.fx_speed_scale, MECH.slowmo_fx.fx_frames)
+            end
+            if fx.error then imgui.text("Slow-motion error: " .. fx.error) end
+            imgui.text(string.format("Slow-motion calls made: %d", fx.calls))
             for i = 0, 1 do
                 imgui.text(string.format("P%d  rage: %s  heat: %s (%d ticks left, available this round: %s)  recoverable: %d", i + 1,
                     tostring(state.p[i].rage), tostring(Engine.heat_active(state, i)),

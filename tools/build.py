@@ -18,10 +18,12 @@ KIND_REQUIRES = {
              "chip_can_ko", "recover_pct_of_max_per_landed_attack", "hit_trims_recoverable_pct", "heat_start_heals_pct_of_pool", "key_p1", "key_p2"],
     "heat_smash": ["armed_ticks", "bonus_pct_of_max"],
     "rage_art": ["armed_ticks", "bonus_pct_of_max", "uses_per_round", "key_p1", "key_p2"],
+    "slowmo_fx": ["fx_speed_scale", "fx_frames"],
     "juggle_scaling": [],
+    "hitstop_research": [],
 }
 # Hooks a kind writes to: the hook row must allow writing.
-KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "heat_smash": ["hp_now"], "rage_art": ["hp_now"], "juggle_scaling": []}
+KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "heat_smash": ["hp_now"], "rage_art": ["hp_now"], "slowmo_fx": ["global_speed"], "juggle_scaling": [], "hitstop_research": []}
 STATUS_BUILT = "implemented"
 
 
@@ -55,8 +57,8 @@ def preflight(hooks, mechs):
         hook_ids[row["id"]] = row
         if row.get("kind") not in ("field", "api"):
             errors.append(f"hooks.{row['id']}.kind: must be 'field' or 'api'")
-        if row.get("access") not in ("r", "rw"):
-            errors.append(f"hooks.{row['id']}.access: must be 'r' or 'rw'")
+        if row.get("access") not in ("r", "w", "rw"):
+            errors.append(f"hooks.{row['id']}.access: must be 'r', 'w' or 'rw'")
 
     used = set()
     for row in mechs["rows"]:
@@ -86,7 +88,7 @@ def preflight(hooks, mechs):
     for hid, row in hook_ids.items():
         if hid not in used:
             errors.append(f"hooks.{hid}: no mechanics row uses it")
-        if row.get("read_verified") is not True:
+        if row.get("read_verified") not in (True, "n/a"):
             unverified.append(f"hooks.{hid} (read)")
         if "w" in row.get("access", "") and row.get("write_verified") is not True:
             unverified.append(f"hooks.{hid} (write)")

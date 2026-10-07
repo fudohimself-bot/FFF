@@ -23,6 +23,8 @@ local ROWS = {
       ["heat_start_heals_pct_of_pool"] = "n/a",
       ["armed_ticks"] = "n/a",
       ["bonus_pct_of_max"] = "n/a",
+      ["fx_speed_scale"] = "n/a",
+      ["fx_frames"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -32,8 +34,8 @@ local ROWS = {
         "hp_max"
       },
       ["status"] = "implemented",
-      ["verified"] = false,
-      ["note"] = "Tekken 8 Rage: at or under 25% health (45 of 180), every hit deals 10% more damage (rounded down) and chip damage taken is cut by 70%. Not possible here: Rage Art. The earlier numbers (20%, +15%) were verified working in game; these new numbers are untested."
+      ["verified"] = true,
+      ["note"] = "Tekken 8 Rage: at or under 25% health (45 of 180), every hit deals 10% more damage (rounded down) and chip damage taken is cut by 70%. Not possible here: Rage Art. The earlier numbers (20%, +15%) were verified working in game; these new numbers are untested. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
     },
     {
       ["id"] = "heat",
@@ -54,6 +56,8 @@ local ROWS = {
       ["heat_start_heals_pct_of_pool"] = 50,
       ["armed_ticks"] = "n/a",
       ["bonus_pct_of_max"] = "n/a",
+      ["fx_speed_scale"] = "n/a",
+      ["fx_frames"] = "n/a",
       ["key_p1"] = 112,
       ["key_p2"] = 113,
       ["uses_hooks"] = {
@@ -67,8 +71,8 @@ local ROWS = {
         "button_state"
       },
       ["status"] = "implemented",
-      ["verified"] = false,
-      ["note"] = "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) to start Heat. It can be used once per round and lasts 10 seconds of running time (600 match ticks, about 60 per second); the timer stops while the opponent is in hitstun. Heat gives no damage bonus. A blocked hit costs the blocker chip damage that cannot KO; it is recoverable and is won back when the chipped fighter lands attacks. Not possible here: Heat Smash, Heat Dash, Heat Burst (2+3) input and Engager moves. Earlier version (+15% damage, 20 second cooldown, permanent chip) was verified in game; this version is a redesign and is untested."
+      ["verified"] = true,
+      ["note"] = "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) to start Heat. It can be used once per round and lasts 10 seconds of running time (600 match ticks, about 60 per second); the timer stops while the opponent is in hitstun. Heat gives no damage bonus. A blocked hit costs the blocker chip damage that cannot KO; it is recoverable and is won back when the chipped fighter lands attacks. Not possible here: Heat Smash, Heat Dash, Heat Burst (2+3) input and Engager moves. Earlier version (+15% damage, 20 second cooldown, permanent chip) was verified in game; this version is a redesign and is untested. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
     },
     {
       ["id"] = "heat_smash",
@@ -89,6 +93,8 @@ local ROWS = {
       ["heat_start_heals_pct_of_pool"] = "n/a",
       ["armed_ticks"] = 120,
       ["bonus_pct_of_max"] = 15,
+      ["fx_speed_scale"] = "n/a",
+      ["fx_frames"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -99,8 +105,8 @@ local ROWS = {
         "key_state"
       },
       ["status"] = "implemented",
-      ["verified"] = false,
-      ["note"] = "Heat Smash stand-in: press the Heat key again while Heat is running to arm it for 2 seconds. The next hit that lands deals extra damage (15% of max health) and uses up your remaining Heat. If it does not land in time, the Heat is spent anyway. A blocked attack does not use it up. Not the real move: no animation, no armor."
+      ["verified"] = true,
+      ["note"] = "Heat Smash stand-in: press the Heat key again while Heat is running to arm it for 2 seconds. The next hit that lands deals extra damage (15% of max health) and uses up your remaining Heat. If it does not land in time, the Heat is spent anyway. A blocked attack does not use it up. Not the real move: no animation, no armor. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
     },
     {
       ["id"] = "rage_art",
@@ -121,6 +127,8 @@ local ROWS = {
       ["heat_start_heals_pct_of_pool"] = "n/a",
       ["armed_ticks"] = 120,
       ["bonus_pct_of_max"] = 18,
+      ["fx_speed_scale"] = "n/a",
+      ["fx_frames"] = "n/a",
       ["key_p1"] = 114,
       ["key_p2"] = 115,
       ["uses_hooks"] = {
@@ -131,8 +139,38 @@ local ROWS = {
         "key_state"
       },
       ["status"] = "implemented",
+      ["verified"] = true,
+      ["note"] = "Rage Art stand-in: while in Rage, press the key (P1 F3 = 114, P2 F4 = 115) to arm it for 2 seconds, once per round. The next hit that lands deals extra damage (18% of max health), removes the opponent's recoverable health, wins back some of yours, and ends your Rage. If it does not land in time, Rage still ends. Not the real move: no animation or cinematic. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
+    },
+    {
+      ["id"] = "slowmo_fx",
+      ["enabled"] = false,
+      ["kind"] = "slowmo_fx",
+      ["trigger"] = "smash_or_art_landed",
+      ["hp_threshold_pct"] = "n/a",
+      ["damage_mult"] = "n/a",
+      ["duration_ticks"] = "n/a",
+      ["cooldown_ticks"] = "n/a",
+      ["chip_pct_of_max"] = "n/a",
+      ["uses_per_round"] = "n/a",
+      ["pause_while_opponent_in_hitstun"] = "n/a",
+      ["chip_can_ko"] = "n/a",
+      ["recover_pct_of_max_per_landed_attack"] = "n/a",
+      ["chip_taken_reduction_pct"] = "n/a",
+      ["hit_trims_recoverable_pct"] = "n/a",
+      ["heat_start_heals_pct_of_pool"] = "n/a",
+      ["armed_ticks"] = "n/a",
+      ["bonus_pct_of_max"] = "n/a",
+      ["fx_speed_scale"] = 0.35,
+      ["fx_frames"] = 45,
+      ["key_p1"] = "n/a",
+      ["key_p2"] = "n/a",
+      ["uses_hooks"] = {
+        "global_speed"
+      },
+      ["status"] = "implemented",
       ["verified"] = false,
-      ["note"] = "Rage Art stand-in: while in Rage, press the key (P1 F3 = 114, P2 F4 = 115) to arm it for 2 seconds, once per round. The next hit that lands deals extra damage (18% of max health), removes the opponent's recoverable health, wins back some of yours, and ends your Rage. If it does not land in time, Rage still ends. Not the real move: no animation or cinematic."
+      ["note"] = "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call."
     }
   },
   ["hooks"] = {
@@ -282,6 +320,72 @@ local ROWS = {
       ["read_verified"] = false,
       ["write_verified"] = "n/a",
       ["evidence"] = "Field name seen in the probe's field list. Which bit is which button is unknown: the panel shows the live value so the bits can be decoded."
+    },
+    {
+      ["id"] = "global_speed",
+      ["kind"] = "api",
+      ["path_steps"] = {
+        "via.Application",
+        "set_GlobalSpeed"
+      },
+      ["access"] = "w",
+      ["value_type"] = "float",
+      ["purpose"] = "Slow the whole game briefly for dramatic moments (Heat Smash or Rage Art landing)",
+      ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
+      ["read_verified"] = "n/a",
+      ["write_verified"] = false,
+      ["evidence"] = "None yet. The panel has a test button; the probe checks the engine type exists."
+    },
+    {
+      ["id"] = "sleep_time",
+      ["kind"] = "field",
+      ["path_steps"] = {
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "sleep_time"
+      },
+      ["access"] = "r",
+      ["value_type"] = "int",
+      ["purpose"] = "Research: a candidate for the game's hit freeze, to make hits feel weightier",
+      ["source"] = "Fighter field list from the probe; meaning unknown",
+      ["read_verified"] = false,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+    },
+    {
+      ["id"] = "damage_sleep",
+      ["kind"] = "field",
+      ["path_steps"] = {
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "damage_sleep"
+      },
+      ["access"] = "r",
+      ["value_type"] = "int",
+      ["purpose"] = "Research: another candidate for the game's hit freeze",
+      ["source"] = "Fighter field list from the probe; meaning unknown",
+      ["read_verified"] = false,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+    },
+    {
+      ["id"] = "hit_stop",
+      ["kind"] = "field",
+      ["path_steps"] = {
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "hit_stop"
+      },
+      ["access"] = "r",
+      ["value_type"] = "int",
+      ["purpose"] = "Research: the hit freeze field the community replay script reads; it was NOT in the fighter field list, so it may not exist on this object",
+      ["source"] = "SF6_replay_capture reads cPlayer[i].hit_stop",
+      ["read_verified"] = false,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Not in the probe's field list for the fighter object. The probe will say whether reading it works."
     }
   }
 }
@@ -303,7 +407,7 @@ local function new_player()
 end
 
 function Engine.new_state()
-    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, smash_count = 0, art_count = 0, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
+    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, smash_count = 0, art_count = 0, fx = nil, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
 end
 
 local function enabled(id)
@@ -508,6 +612,7 @@ function Engine.step(st, snap)
                 st.p[a].heat_left = 0
                 st.smash_count = st.smash_count + 1
                 st.last_event = string.format("P%d Heat Smash LANDED for %d extra, Heat spent", a + 1, extra)
+                if enabled("slowmo_fx") then st.fx = { scale = MECH.slowmo_fx.fx_speed_scale, frames = MECH.slowmo_fx.fx_frames } end
             end
             if enabled("rage_art") and st.p[a].art_left > 0 and hp[v] > 0 then
                 local extra = round_half_up(st.p[v].max_hp * MECH.rage_art.bonus_pct_of_max / 100.0)
@@ -524,6 +629,7 @@ function Engine.step(st, snap)
                 st.p[a].rage_spent = true
                 st.art_count = st.art_count + 1
                 st.last_event = string.format("P%d Rage Art LANDED for %d extra, Rage spent", a + 1, extra)
+                if enabled("slowmo_fx") then st.fx = { scale = MECH.slowmo_fx.fx_speed_scale, frames = MECH.slowmo_fx.fx_frames } end
             end
         end
     end
@@ -600,6 +706,61 @@ if re ~= nil and sdk ~= nil then
     local last_status = "waiting for a match"
     local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 } }
     local hud = { show = true, error = nil }
+    local fx = { left = 0, error = nil, calls = 0 }
+
+    -- Research readouts: live values of the fields that might be the game's hit freeze.
+    local WATCH = {}
+    for _, id in ipairs({ "sleep_time", "damage_sleep", "hit_stop" }) do
+        for _, h in ipairs(ROWS.hooks) do
+            if h.id == id then
+                WATCH[#WATCH + 1] = { id = id, field = h.path_steps[#h.path_steps],
+                                      now = { [0] = "n/a", [1] = "n/a" }, max = { [0] = 0, [1] = 0 } }
+            end
+        end
+    end
+
+    local function update_watch(players)
+        for _, w in ipairs(WATCH) do
+            for i = 0, 1 do
+                local ok, v = pcall(function() return players[i][w.field] end)
+                local n = ok and v ~= nil and tonumber(v) or nil
+                if n == nil and ok and v ~= nil then n = tonumber(tostring(v)) end
+                if n ~= nil then
+                    w.now[i] = n
+                    if n > w.max[i] then w.max[i] = n end
+                else
+                    w.now[i] = "n/a"
+                end
+            end
+        end
+    end
+
+    -- Global game speed (1.0 = normal). Returns true if the engine accepted the call.
+    local function set_speed(v)
+        local app = sdk.get_native_singleton("via.Application")
+        local t = sdk.find_type_definition("via.Application")
+        sdk.call_native_func(app, t, "set_GlobalSpeed", v)
+        fx.calls = fx.calls + 1
+    end
+
+    local function restore_speed()
+        local ok = pcall(set_speed, 1.0)
+        fx.left = 0
+        return ok
+    end
+
+    local function start_fx(scale, frames)
+        local ok, err = pcall(set_speed, scale)
+        if ok then
+            fx.left = frames
+            fx.error = nil
+        else
+            fx.error = tostring(err)
+            fx.left = 0
+            if MECH.slowmo_fx then MECH.slowmo_fx.enabled = false end  -- the game refused it: stop trying
+            pcall(set_speed, 1.0)
+        end
+    end
 
     local function num(v)
         local n = tonumber(v)
@@ -680,6 +841,20 @@ if re ~= nil and sdk ~= nil then
             last_error = tostring(writes)
             return
         end
+        update_watch(players)
+        -- Slow-motion for big moments: start when the rules ask for it, always hand the speed back afterwards.
+        if state.fx ~= nil then
+            if MECH.slowmo_fx ~= nil and MECH.slowmo_fx.enabled then start_fx(state.fx.scale, state.fx.frames) end
+            state.fx = nil
+        end
+        if fx.left > 0 then
+            if MECH.slowmo_fx == nil or not MECH.slowmo_fx.enabled then
+                restore_speed()
+            else
+                fx.left = fx.left - 1
+                if fx.left == 0 then restore_speed() end
+            end
+        end
         last_status = "running (round " .. tostring(snap.round) .. ")"
         local okh, errh = pcall(draw_hud)
         hud.error = (not okh) and tostring(errh) or nil
@@ -703,6 +878,12 @@ if re ~= nil and sdk ~= nil then
         end
     end)
 
+    if re.on_script_reset ~= nil then
+        re.on_script_reset(function()
+            restore_speed()
+        end)
+    end
+
     re.on_draw_ui(function()
         if imgui.tree_node("SF6 Tekken Mode (offline only)") then
             imgui.text("Status: " .. last_status)
@@ -710,7 +891,7 @@ if re ~= nil and sdk ~= nil then
             imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
             imgui.text(string.format("Chip hits: %d   block timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 state.chip_count, stats.guard_now[0], stats.guard_now[1], stats.guard_max[0], stats.guard_max[1]))
-            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art" }) do
+            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art", "slowmo_fx" }) do
                 if MECH[id] ~= nil then
                     local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                     if changed then MECH[id].enabled = value end
@@ -719,6 +900,10 @@ if re ~= nil and sdk ~= nil then
             imgui.text(string.format("Heat Smashes landed: %d   Rage Arts landed: %d", state.smash_count, state.art_count))
             imgui.text(string.format("Hitstun timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 stats.hit_now[0], stats.hit_now[1], stats.hit_max[0], stats.hit_max[1]))
+            for _, w in ipairs(WATCH) do
+                imgui.text(string.format("Hit-freeze candidate %s: now P1 %s / P2 %s, highest seen P1 %s / P2 %s",
+                    w.field, tostring(w.now[0]), tostring(w.now[1]), tostring(w.max[0]), tostring(w.max[1])))
+            end
             imgui.text(string.format("Held buttons (game bits) P1 %d [%s]  P2 %d [%s]",
                 stats.btn_now[0], bits(stats.btn_now[0]), stats.btn_now[1], bits(stats.btn_now[1])))
             local hchanged, hvalue = imgui.checkbox("show on-screen Heat / Rage readout", hud.show)
@@ -731,6 +916,11 @@ if re ~= nil and sdk ~= nil then
             if imgui.button("start P1 Heat now (no key)") then Engine.start_heat(state, 0) end
             if imgui.button("arm P1 Heat Smash (needs Heat on)") then Engine.arm_smash(state, 0) end
             if imgui.button("arm P1 Rage Art (no key)") then Engine.arm_art(state, 0) end
+            if MECH.slowmo_fx ~= nil and imgui.button("test slow-motion now (about 1 second)") then
+                start_fx(MECH.slowmo_fx.fx_speed_scale, MECH.slowmo_fx.fx_frames)
+            end
+            if fx.error then imgui.text("Slow-motion error: " .. fx.error) end
+            imgui.text(string.format("Slow-motion calls made: %d", fx.calls))
             for i = 0, 1 do
                 imgui.text(string.format("P%d  rage: %s  heat: %s (%d ticks left, available this round: %s)  recoverable: %d", i + 1,
                     tostring(state.p[i].rage), tostring(Engine.heat_active(state, i)),

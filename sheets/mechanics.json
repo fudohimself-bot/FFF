@@ -1,6 +1,6 @@
 {
   "sheet": "mechanics",
-  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here). Heat Smash and Rage Art are stand-ins: they are damage bonuses on your next landed hit, armed with a key, not real moves. bonus_pct_of_max, armed_ticks and heat_start_heals_pct_of_pool are my estimates for fun, not Tekken's numbers.",
+  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here). Heat Smash and Rage Art are stand-ins: they are damage bonuses on your next landed hit, armed with a key, not real moves. bonus_pct_of_max, armed_ticks and heat_start_heals_pct_of_pool are my estimates for fun, not Tekken's numbers. slowmo_fx slows the whole game for fx_frames screen frames at fx_speed_scale (1.0 = normal) when a Heat Smash or Rage Art lands. It is an experiment: it is off until the user tests it, and it turns itself off if the game refuses it.",
   "columns": [
     "id",
     "enabled",
@@ -20,6 +20,8 @@
     "heat_start_heals_pct_of_pool",
     "armed_ticks",
     "bonus_pct_of_max",
+    "fx_speed_scale",
+    "fx_frames",
     "key_p1",
     "key_p2",
     "uses_hooks",
@@ -47,6 +49,8 @@
       "heat_start_heals_pct_of_pool": "n/a",
       "armed_ticks": "n/a",
       "bonus_pct_of_max": "n/a",
+      "fx_speed_scale": "n/a",
+      "fx_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -56,8 +60,8 @@
         "hp_max"
       ],
       "status": "implemented",
-      "verified": false,
-      "note": "Tekken 8 Rage: at or under 25% health (45 of 180), every hit deals 10% more damage (rounded down) and chip damage taken is cut by 70%. Not possible here: Rage Art. The earlier numbers (20%, +15%) were verified working in game; these new numbers are untested."
+      "verified": true,
+      "note": "Tekken 8 Rage: at or under 25% health (45 of 180), every hit deals 10% more damage (rounded down) and chip damage taken is cut by 70%. Not possible here: Rage Art. The earlier numbers (20%, +15%) were verified working in game; these new numbers are untested. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
     },
     {
       "id": "heat",
@@ -78,6 +82,8 @@
       "heat_start_heals_pct_of_pool": 50,
       "armed_ticks": "n/a",
       "bonus_pct_of_max": "n/a",
+      "fx_speed_scale": "n/a",
+      "fx_frames": "n/a",
       "key_p1": 112,
       "key_p2": 113,
       "uses_hooks": [
@@ -91,8 +97,8 @@
         "button_state"
       ],
       "status": "implemented",
-      "verified": false,
-      "note": "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) to start Heat. It can be used once per round and lasts 10 seconds of running time (600 match ticks, about 60 per second); the timer stops while the opponent is in hitstun. Heat gives no damage bonus. A blocked hit costs the blocker chip damage that cannot KO; it is recoverable and is won back when the chipped fighter lands attacks. Not possible here: Heat Smash, Heat Dash, Heat Burst (2+3) input and Engager moves. Earlier version (+15% damage, 20 second cooldown, permanent chip) was verified in game; this version is a redesign and is untested."
+      "verified": true,
+      "note": "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) to start Heat. It can be used once per round and lasts 10 seconds of running time (600 match ticks, about 60 per second); the timer stops while the opponent is in hitstun. Heat gives no damage bonus. A blocked hit costs the blocker chip damage that cannot KO; it is recoverable and is won back when the chipped fighter lands attacks. Not possible here: Heat Smash, Heat Dash, Heat Burst (2+3) input and Engager moves. Earlier version (+15% damage, 20 second cooldown, permanent chip) was verified in game; this version is a redesign and is untested. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
     },
     {
       "id": "juggle_scaling",
@@ -113,6 +119,8 @@
       "heat_start_heals_pct_of_pool": "n/a",
       "armed_ticks": "n/a",
       "bonus_pct_of_max": "n/a",
+      "fx_speed_scale": "n/a",
+      "fx_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -143,6 +151,8 @@
       "heat_start_heals_pct_of_pool": "n/a",
       "armed_ticks": 120,
       "bonus_pct_of_max": 15,
+      "fx_speed_scale": "n/a",
+      "fx_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -153,8 +163,8 @@
         "key_state"
       ],
       "status": "implemented",
-      "verified": false,
-      "note": "Heat Smash stand-in: press the Heat key again while Heat is running to arm it for 2 seconds. The next hit that lands deals extra damage (15% of max health) and uses up your remaining Heat. If it does not land in time, the Heat is spent anyway. A blocked attack does not use it up. Not the real move: no animation, no armor."
+      "verified": true,
+      "note": "Heat Smash stand-in: press the Heat key again while Heat is running to arm it for 2 seconds. The next hit that lands deals extra damage (15% of max health) and uses up your remaining Heat. If it does not land in time, the Heat is spent anyway. A blocked attack does not use it up. Not the real move: no animation, no armor. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
     },
     {
       "id": "rage_art",
@@ -175,6 +185,8 @@
       "heat_start_heals_pct_of_pool": "n/a",
       "armed_ticks": 120,
       "bonus_pct_of_max": 18,
+      "fx_speed_scale": "n/a",
+      "fx_frames": "n/a",
       "key_p1": 114,
       "key_p2": 115,
       "uses_hooks": [
@@ -185,8 +197,70 @@
         "key_state"
       ],
       "status": "implemented",
+      "verified": true,
+      "note": "Rage Art stand-in: while in Rage, press the key (P1 F3 = 114, P2 F4 = 115) to arm it for 2 seconds, once per round. The next hit that lands deals extra damage (18% of max health), removes the opponent's recoverable health, wins back some of yours, and ends your Rage. If it does not land in time, Rage still ends. Not the real move: no animation or cinematic. User played the Tekken 8 version offline and reported 'it feels good now' (2026-10-07). That is a general confirmation: the individual readouts were not reviewed one by one."
+    },
+    {
+      "id": "slowmo_fx",
+      "enabled": false,
+      "kind": "slowmo_fx",
+      "trigger": "smash_or_art_landed",
+      "hp_threshold_pct": "n/a",
+      "damage_mult": "n/a",
+      "duration_ticks": "n/a",
+      "cooldown_ticks": "n/a",
+      "chip_pct_of_max": "n/a",
+      "uses_per_round": "n/a",
+      "pause_while_opponent_in_hitstun": "n/a",
+      "chip_can_ko": "n/a",
+      "recover_pct_of_max_per_landed_attack": "n/a",
+      "chip_taken_reduction_pct": "n/a",
+      "hit_trims_recoverable_pct": "n/a",
+      "heat_start_heals_pct_of_pool": "n/a",
+      "armed_ticks": "n/a",
+      "bonus_pct_of_max": "n/a",
+      "fx_speed_scale": 0.35,
+      "fx_frames": 45,
+      "key_p1": "n/a",
+      "key_p2": "n/a",
+      "uses_hooks": [
+        "global_speed"
+      ],
+      "status": "implemented",
       "verified": false,
-      "note": "Rage Art stand-in: while in Rage, press the key (P1 F3 = 114, P2 F4 = 115) to arm it for 2 seconds, once per round. The next hit that lands deals extra damage (18% of max health), removes the opponent's recoverable health, wins back some of yours, and ends your Rage. If it does not land in time, Rage still ends. Not the real move: no animation or cinematic."
+      "note": "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call."
+    },
+    {
+      "id": "hitstop_research",
+      "enabled": false,
+      "kind": "hitstop_research",
+      "trigger": "n/a",
+      "hp_threshold_pct": "n/a",
+      "damage_mult": "n/a",
+      "duration_ticks": "n/a",
+      "cooldown_ticks": "n/a",
+      "chip_pct_of_max": "n/a",
+      "uses_per_round": "n/a",
+      "pause_while_opponent_in_hitstun": "n/a",
+      "chip_can_ko": "n/a",
+      "recover_pct_of_max_per_landed_attack": "n/a",
+      "chip_taken_reduction_pct": "n/a",
+      "hit_trims_recoverable_pct": "n/a",
+      "heat_start_heals_pct_of_pool": "n/a",
+      "armed_ticks": "n/a",
+      "bonus_pct_of_max": "n/a",
+      "fx_speed_scale": "n/a",
+      "fx_frames": "n/a",
+      "key_p1": "n/a",
+      "key_p2": "n/a",
+      "uses_hooks": [
+        "sleep_time",
+        "damage_sleep",
+        "hit_stop"
+      ],
+      "status": "research",
+      "verified": false,
+      "note": "Weightier hits: first find out which field is the game's hit freeze and whether it can be written. The panel shows the live values of all three candidates."
     }
   ]
 }

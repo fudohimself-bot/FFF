@@ -150,11 +150,85 @@ local HOOKS = {
     ["read_verified"] = false,
     ["write_verified"] = "n/a",
     ["evidence"] = "Field name seen in the probe's field list. Which bit is which button is unknown: the panel shows the live value so the bits can be decoded."
+  },
+  {
+    ["id"] = "global_speed",
+    ["kind"] = "api",
+    ["path_steps"] = {
+      "via.Application",
+      "set_GlobalSpeed"
+    },
+    ["access"] = "w",
+    ["value_type"] = "float",
+    ["purpose"] = "Slow the whole game briefly for dramatic moments (Heat Smash or Rage Art landing)",
+    ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
+    ["read_verified"] = "n/a",
+    ["write_verified"] = false,
+    ["evidence"] = "None yet. The panel has a test button; the probe checks the engine type exists."
+  },
+  {
+    ["id"] = "sleep_time",
+    ["kind"] = "field",
+    ["path_steps"] = {
+      "Player",
+      "mcPlayer",
+      "[i]",
+      "sleep_time"
+    },
+    ["access"] = "r",
+    ["value_type"] = "int",
+    ["purpose"] = "Research: a candidate for the game's hit freeze, to make hits feel weightier",
+    ["source"] = "Fighter field list from the probe; meaning unknown",
+    ["read_verified"] = false,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+  },
+  {
+    ["id"] = "damage_sleep",
+    ["kind"] = "field",
+    ["path_steps"] = {
+      "Player",
+      "mcPlayer",
+      "[i]",
+      "damage_sleep"
+    },
+    ["access"] = "r",
+    ["value_type"] = "int",
+    ["purpose"] = "Research: another candidate for the game's hit freeze",
+    ["source"] = "Fighter field list from the probe; meaning unknown",
+    ["read_verified"] = false,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+  },
+  {
+    ["id"] = "hit_stop",
+    ["kind"] = "field",
+    ["path_steps"] = {
+      "Player",
+      "mcPlayer",
+      "[i]",
+      "hit_stop"
+    },
+    ["access"] = "r",
+    ["value_type"] = "int",
+    ["purpose"] = "Research: the hit freeze field the community replay script reads; it was NOT in the fighter field list, so it may not exist on this object",
+    ["source"] = "SF6_replay_capture reads cPlayer[i].hit_stop",
+    ["read_verified"] = false,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Not in the probe's field list for the fighter object. The probe will say whether reading it works."
   }
 }
 
 if re ~= nil and sdk ~= nil then
     local report_text = "not run yet"
+
+    -- How to check each api-style hook from the sheet.
+    local API_CHECKS = {
+        key_state = function() return reframework ~= nil and reframework.is_key_down ~= nil end,
+        global_speed = function()
+            return sdk.get_native_singleton("via.Application") ~= nil and sdk.find_type_definition("via.Application") ~= nil
+        end,
+    }
 
     local function describe(v)
         local n = tonumber(v)
@@ -191,7 +265,15 @@ if re ~= nil and sdk ~= nil then
         for _, hook in ipairs(HOOKS) do
             local entry = { id = hook.id, kind = hook.kind }
             if hook.kind == "api" then
-                entry.ok = (reframework ~= nil and reframework.is_key_down ~= nil)
+                local check = API_CHECKS[hook.id]
+                if check == nil then
+                    entry.ok = false
+                    entry.error = "no check written for this api hook"
+                else
+                    local okc, res = pcall(check)
+                    entry.ok = okc and res == true
+                    if not okc then entry.error = tostring(res) end
+                end
             else
                 local per_player = {}
                 local uses_player = false

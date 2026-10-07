@@ -593,8 +593,8 @@ FAKE_REFRAMEWORK = r"""
 -- A fake REFramework: just enough of re / sdk / imgui / json / reframework for the glue code to run.
 fake = { frame_cbs = {}, ui_cbs = {}, saved = {}, keys = {}, ui_text = {}, clicks = {} }
 players = {
-  [0] = { pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
-  [1] = { pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
+  [0] = { sleep_time = 0, damage_sleep = 0, pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
+  [1] = { sleep_time = 0, damage_sleep = 0, pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
 }
 battle = {
   Round = { RoundNo = 1 }, Game = { stage_timer = 0 },
@@ -603,11 +603,24 @@ battle = {
 re = {
   on_frame = function(cb) table.insert(fake.frame_cbs, cb) end,
   on_draw_ui = function(cb) table.insert(fake.ui_cbs, cb) end,
+  on_script_reset = function(cb) fake.reset_cb = cb end,
 }
-sdk = { find_type_definition = function(name)
-  if name ~= "gBattle" or fake.no_battle then return nil end
-  return { get_field = function(self, f) return { get_data = function() return battle[f] end } end }
-end }
+fake.speeds = {}
+fake.app = {}
+sdk_get_native = function(name) if fake.no_app then return nil end return fake.app end
+sdk = {
+  find_type_definition = function(name)
+    if name == "via.Application" then return { name = name } end
+    if name ~= "gBattle" or fake.no_battle then return nil end
+    return { get_field = function(self, f) return { get_data = function() return battle[f] end } end }
+  end,
+  get_native_singleton = function(name) return sdk_get_native(name) end,
+  call_native_func = function(obj, t, method, value)
+    if fake.speed_error then error("call refused") end
+    assert(method == "set_GlobalSpeed")
+    table.insert(fake.speeds, value)
+  end,
+}
 reframework = { is_key_down = function(self, vk) return fake.keys[vk] == true end }
 imgui = {
   tree_node = function() return true end, tree_pop = function() end,
@@ -761,6 +774,72 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua.execute("battle.Game.stage_timer = 1")
         self.frame(lua)
 
+    def _ui(self, lua):
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        return " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+
+    def _arm_smash_and_land(self, lua):
+        self.frame(lua)
+        lua.execute("fake.keys[112] = true; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.keys[112] = false; battle.Game.stage_timer = 2")
+        self.frame(lua)
+        lua.execute("fake.keys[112] = true; battle.Game.stage_timer = 3")
+        self.frame(lua)
+        lua.execute("fake.keys[112] = false; battle.Game.stage_timer = 4")
+        self.frame(lua)
+        lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 5")
+        self.frame(lua)
+
+    def test_slowmo_is_off_by_default_so_a_landing_does_not_touch_game_speed(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._arm_smash_and_land(lua)
+        self.assertIn("Heat Smash LANDED", self._ui(lua))
+        self.assertEqual(len(list(lua.eval("fake.speeds").values())), 0)
+
+    def test_slowmo_slows_then_restores_when_enabled(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true")
+        self._arm_smash_and_land(lua)
+        speeds = list(lua.eval("fake.speeds").values())
+        self.assertEqual(speeds, [0.35])
+        for n in range(6, 6 + 50):
+            lua.execute(f"battle.Game.stage_timer = {n}")
+            self.frame(lua)
+        speeds = list(lua.eval("fake.speeds").values())
+        self.assertEqual(speeds, [0.35, 1.0])  # speed handed back after the effect
+
+    def test_slowmo_restores_if_switched_off_midway(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true")
+        self._arm_smash_and_land(lua)
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = false; battle.Game.stage_timer = 9")
+        self.frame(lua)
+        self.assertEqual(list(lua.eval("fake.speeds").values()), [0.35, 1.0])
+
+    def test_script_reset_restores_normal_speed(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.reset_cb()")
+        self.assertEqual(list(lua.eval("fake.speeds").values()), [1.0])
+
+    def test_refused_slowmo_turns_itself_off_and_says_why(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; fake.speed_error = true")
+        self._arm_smash_and_land(lua)  # must not raise
+        self.assertFalse(lua.eval("SF6_TEKKEN.MECH.slowmo_fx.enabled"))
+        self.assertIn("Slow-motion error: ", self._ui(lua))
+
+    def test_hit_freeze_candidates_show_live_and_missing_fields_say_n_a(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("players[1].sleep_time = 7; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("players[1].sleep_time = 0; battle.Game.stage_timer = 2")
+        self.frame(lua)
+        ui = self._ui(lua)
+        self.assertIn("Hit-freeze candidate sleep_time: now P1 0 / P2 0, highest seen P1 0 / P2 7", ui)
+        self.assertIn("Hit-freeze candidate hit_stop: now P1 n/a / P2 n/a", ui)  # the fake has no such field
+
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")
         lua.execute("fake.no_battle = true")
@@ -787,6 +866,9 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.assertTrue(by_id["hp_now"]["ok"])
         self.assertEqual(len(by_id["hp_now"]["reads"]), 2)
         self.assertTrue(by_id["key_state"]["ok"])
+        self.assertTrue(by_id["global_speed"]["ok"])
+        self.assertFalse(by_id["hit_stop"]["ok"])  # the fake fighter has no hit_stop field
+        self.assertTrue(by_id["sleep_time"]["ok"])
 
     def run_write_test(self, lua, frames=125):
         lua.execute("fake.press = 'Run write test (takes 1 health point from P1)'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")

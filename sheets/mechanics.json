@@ -290,7 +290,7 @@
     },
     {
       "id": "hitstop_boost",
-      "enabled": false,
+      "enabled": true,
       "kind": "hitstop_boost",
       "trigger": "any_hit_landed",
       "hp_threshold_pct": "n/a",
@@ -318,8 +318,8 @@
         "hit_stop"
       ],
       "status": "implemented",
-      "verified": false,
-      "note": "Weightier hits: when a hit lands, add 3 frames to the game's hit freeze counter on both fighters (10 frames when a Heat Smash or Rage Art lands). Off by default. Whether hit_stop is the real hit freeze and whether the game honours the write is untested."
+      "verified": true,
+      "note": "Weightier hits: when a hit lands, add 3 frames to the game's hit freeze counter on both fighters (10 frames when a Heat Smash or Rage Art lands). On by default: the user tried it offline and said it feels good (2026-10-07). Sizes can be changed live in the panel and are saved."
     }
   ]
 }

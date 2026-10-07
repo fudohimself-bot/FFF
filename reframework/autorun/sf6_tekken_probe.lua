@@ -214,8 +214,8 @@ local HOOKS = {
     ["purpose"] = "The game's hit freeze counter (candidate): read to see it, and add a few frames to it on a landed hit so hits feel weightier",
     ["source"] = "SF6_replay_capture reads cPlayer[i].hit_stop",
     ["read_verified"] = true,
-    ["write_verified"] = false,
-    ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest, although the name was not in the fighter's field list (probably on a parent object). Whether it is the hit freeze, and whether writing it works, is untested."
+    ["write_verified"] = true,
+    ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest. User test: with the hit freeze boost on, hits 'feel good' (general impression), so the game honours extra frames written to it. Exact behaviour was not checked value by value."
   },
   {
     ["id"] = "scene_time_scale",

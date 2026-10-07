@@ -638,14 +638,22 @@ reframework = { is_key_down = function(self, vk) return fake.keys[vk] == true en
 imgui = {
   tree_node = function() return true end, tree_pop = function() end,
   text = function(t) table.insert(fake.ui_text, t) end,
-  checkbox = function(label, v) return false, v end,
+  checkbox = function(label, v)
+    if fake.toggle == label then return true, not v end
+    return false, v
+  end,
+  slider_int = function(label, v, lo, hi) if fake.slide and fake.slide[1] == label then return true, fake.slide[2] end return false, v end,
+  slider_float = function(label, v, lo, hi) if fake.slide and fake.slide[1] == label then return true, fake.slide[2] end return false, v end,
   button = function(label) return fake.press == label end,
   begin_window = function(name) fake.window = name; return true end, end_window = function() end,
   progress_bar = function(frac, size, text) table.insert(fake.bars, { frac = frac, text = text }) end,
 }
 Vector2f = { new = function(x, y) return { x = x, y = y } end }
 fake.bars = {}
-json = { dump_file = function(path, tbl) fake.saved[path] = tbl; return true end }
+json = {
+  dump_file = function(path, tbl) if fake.save_error then error("disk full") end fake.saved[path] = tbl; return true end,
+  load_file = function(path) return fake.preload and fake.preload[path] or nil end,
+}
 """
 
 
@@ -904,8 +912,16 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua.execute("fake.press = 'use method: scene_time_scale'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")
         self.assertIn("Slow-motion method: scene_time_scale", self._ui(lua))
 
-    def test_hit_freeze_boost_is_off_by_default(self):
+    def test_hit_freeze_boost_is_on_by_default(self):
         lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        self.assertEqual((lua.eval("players[0].hit_stop"), lua.eval("players[1].hit_stop")), (3, 3))
+
+    def test_hit_freeze_boost_can_be_switched_off(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.hitstop_boost.enabled = false")
         self.frame(lua)
         lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 1")
         self.frame(lua)
@@ -939,6 +955,85 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.frame(lua)  # must not raise
         self.assertFalse(lua.eval("SF6_TEKKEN.MECH.hitstop_boost.enabled"))
         self.assertIn("Hit freeze error: ", self._ui(lua))
+
+    PATH = "sf6_tekken/settings.json"
+
+    def _saved(self, lua):
+        return lua.eval(f'fake.saved["{self.PATH}"]')
+
+    def test_settings_are_loaded_at_start(self):
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        lua.execute(FAKE_REFRAMEWORK)
+        lua.execute('fake.preload = { ["sf6_tekken/settings.json"] = { hitstop_boost = { enabled = false, boost_frames = 6 }, slowmo_fx = { enabled = true, fx_method = "scene_time_scale", fx_speed_scale = 0.7, fx_frames = 40 }, rage = { enabled = false } } }')
+        lua.execute((ROOT / "reframework" / "autorun" / "sf6_tekken_mode.lua").read_text())
+        self.assertEqual(lua.eval("SF6_TEKKEN.MECH.hitstop_boost.boost_frames"), 6)
+        self.assertFalse(lua.eval("SF6_TEKKEN.MECH.hitstop_boost.enabled"))
+        self.assertFalse(lua.eval("SF6_TEKKEN.MECH.rage.enabled"))
+        self.assertEqual(lua.eval("SF6_TEKKEN.MECH.slowmo_fx.fx_method"), "scene_time_scale")
+        self.assertAlmostEqual(lua.eval("SF6_TEKKEN.MECH.slowmo_fx.fx_speed_scale"), 0.7)
+        self.assertIn("Settings: loaded 7 saved settings", self._ui(lua))
+
+    def test_bad_saved_values_are_ignored_or_clamped(self):
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        lua.execute(FAKE_REFRAMEWORK)
+        lua.execute('''fake.preload = { ["sf6_tekken/settings.json"] = {
+            hitstop_boost = { enabled = "yes", boost_frames = 9999, big_boost_frames = -5 },
+            slowmo_fx = { fx_method = "rm -rf", fx_speed_scale = 0, fx_frames = "a lot" },
+            heat = 5, unknown_mod = { enabled = true } } }''')
+        lua.execute((ROOT / "reframework" / "autorun" / "sf6_tekken_mode.lua").read_text())
+        m = lua.eval("SF6_TEKKEN.MECH")
+        self.assertTrue(m.hitstop_boost.enabled)  # "yes" is not a boolean: default kept
+        self.assertEqual(m.hitstop_boost.boost_frames, 20)  # clamped
+        self.assertEqual(m.hitstop_boost.big_boost_frames, 0)  # clamped
+        self.assertEqual(m.slowmo_fx.fx_method, "max_fps")  # not a known method: default kept
+        self.assertAlmostEqual(m.slowmo_fx.fx_speed_scale, 0.1)  # clamped
+        self.assertEqual(m.slowmo_fx.fx_frames, 30)  # a string is not a number: default kept
+        self.assertTrue(m.heat.enabled)
+
+    def test_a_non_table_settings_file_is_ignored(self):
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        lua.execute(FAKE_REFRAMEWORK)
+        lua.execute('fake.preload = { ["sf6_tekken/settings.json"] = "garbage" }')
+        lua.execute((ROOT / "reframework" / "autorun" / "sf6_tekken_mode.lua").read_text())
+        self.assertTrue(lua.eval("SF6_TEKKEN.MECH.rage.enabled"))
+
+    def test_changing_a_checkbox_saves_settings(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.assertIsNone(self._saved(lua))
+        lua.execute("fake.toggle = 'rage enabled'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.toggle = nil")
+        self.frame(lua)  # the save happens on the next frame
+        saved = self._saved(lua)
+        self.assertFalse(saved.rage.enabled)
+        self.assertTrue(saved.hitstop_boost.enabled)
+        self.assertEqual(saved.hitstop_boost.boost_frames, 3)
+
+    def test_moving_a_slider_saves_the_new_value(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.slide = { 'hit freeze boost (frames)', 6 }; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.slide = nil")
+        self.frame(lua)
+        self.assertEqual(self._saved(lua).hitstop_boost.boost_frames, 6)
+
+    def test_nothing_is_written_until_something_changes(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("battle.Game.stage_timer = 1")
+        self.frame(lua)
+        self.assertIsNone(self._saved(lua))
+
+    def test_a_failing_save_is_reported_and_does_not_break_the_mod(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.save_error = true; fake.toggle = 'rage enabled'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.toggle = nil")
+        self.frame(lua)  # must not raise
+        self.assertIn("Settings: save failed", self._ui(lua))
+
+    def test_reset_button_restores_defaults_and_saves_them(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.hitstop_boost.boost_frames = 9; SF6_TEKKEN.MECH.rage.enabled = false")
+        lua.execute("fake.press = 'reset settings to defaults'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")
+        self.frame(lua)
+        self.assertEqual(lua.eval("SF6_TEKKEN.MECH.hitstop_boost.boost_frames"), 3)
+        self.assertTrue(lua.eval("SF6_TEKKEN.MECH.rage.enabled"))
+        self.assertEqual(self._saved(lua).hitstop_boost.boost_frames, 3)
 
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")

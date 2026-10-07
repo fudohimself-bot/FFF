@@ -325,6 +325,77 @@ if re ~= nil and sdk ~= nil then
     local last_status = "waiting for a match"
     local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 }, freeze_boosts = 0, freeze_error = nil }
     local hud = { show = true, error = nil }
+
+    -- Settings that survive restarting the game: saved to reframework/data/sf6_tekken/settings.json.
+    local SETTINGS_FILE = "sf6_tekken/settings.json"
+    local SAVE_KEYS = {
+        rage = { "enabled" }, heat = { "enabled" }, heat_smash = { "enabled" }, rage_art = { "enabled" },
+        slowmo_fx = { "enabled", "fx_speed_scale", "fx_frames", "fx_method" },
+        hitstop_boost = { "enabled", "boost_frames", "big_boost_frames" },
+    }
+    local LIMITS = { fx_speed_scale = { 0.1, 1.0 }, fx_frames = { 5, 120 }, boost_frames = { 0, 20 }, big_boost_frames = { 0, 40 } }
+    local VALID_METHODS = { global_speed = true, scene_time_scale = true, max_fps = true }
+    local DEFAULTS = {}
+    for id, keys in pairs(SAVE_KEYS) do
+        if MECH[id] ~= nil then
+            DEFAULTS[id] = {}
+            for _, k in ipairs(keys) do DEFAULTS[id][k] = MECH[id][k] end
+        end
+    end
+    local settings = { dirty = false, note = "defaults (nothing saved yet)" }
+
+    local function clean_value(k, v, default)
+        if type(v) ~= type(default) then return nil end
+        if k == "fx_method" and not VALID_METHODS[v] then return nil end
+        local lim = LIMITS[k]
+        if lim ~= nil then
+            if v ~= v then return nil end  -- NaN
+            v = math.max(lim[1], math.min(lim[2], v))
+        end
+        return v
+    end
+
+    local function load_settings()
+        if json == nil or json.load_file == nil then return end
+        local ok, data = pcall(json.load_file, SETTINGS_FILE)
+        if not ok or type(data) ~= "table" then return end
+        local applied = 0
+        for id, keys in pairs(SAVE_KEYS) do
+            local saved = data[id]
+            if MECH[id] ~= nil and type(saved) == "table" then
+                for _, k in ipairs(keys) do
+                    local v = clean_value(k, saved[k], DEFAULTS[id][k])
+                    if v ~= nil then
+                        MECH[id][k] = v
+                        applied = applied + 1
+                    end
+                end
+            end
+        end
+        settings.note = string.format("loaded %d saved settings", applied)
+    end
+
+    local function save_settings()
+        if json == nil or json.dump_file == nil then return end
+        local out = {}
+        for id, keys in pairs(SAVE_KEYS) do
+            if MECH[id] ~= nil then
+                out[id] = {}
+                for _, k in ipairs(keys) do out[id][k] = MECH[id][k] end
+            end
+        end
+        local ok, err = pcall(json.dump_file, SETTINGS_FILE, out)
+        settings.note = ok and "saved" or ("save failed: " .. tostring(err))
+    end
+
+    local function reset_settings()
+        for id, t in pairs(DEFAULTS) do
+            for k, v in pairs(t) do MECH[id][k] = v end
+        end
+        settings.dirty = true
+    end
+
+    load_settings()
     local fx = { left = 0, error = nil, calls = 0, orig_fps = nil }
 
     -- Research readouts: live values of the fields that might be the game's hit freeze.
@@ -411,7 +482,7 @@ if re ~= nil and sdk ~= nil then
 
     local function start_fx(scale, frames)
         local method = (MECH.slowmo_fx and MECH.slowmo_fx.fx_method) or "global_speed"
-        local impl = SPEED[method]
+        local impl = SPEED[method] or SPEED.max_fps
         local ok, err = pcall(impl.apply, scale)
         fx.calls = fx.calls + 1
         if ok then
@@ -489,6 +560,10 @@ if re ~= nil and sdk ~= nil then
     end
 
     re.on_frame(function()
+        if settings.dirty then
+            settings.dirty = false
+            save_settings()
+        end
         local ok, snap, players = pcall(read_snapshot)
         if not ok then
             last_error = tostring(snap)
@@ -571,7 +646,10 @@ if re ~= nil and sdk ~= nil then
             for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art", "slowmo_fx", "hitstop_boost" }) do
                 if MECH[id] ~= nil then
                     local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
-                    if changed then MECH[id].enabled = value end
+                    if changed then
+                        MECH[id].enabled = value
+                        settings.dirty = true
+                    end
                 end
             end
             imgui.text(string.format("Heat Smashes landed: %d   Rage Arts landed: %d", state.smash_count, state.art_count))
@@ -587,6 +665,8 @@ if re ~= nil and sdk ~= nil then
             if hchanged then hud.show = hvalue; hud.error = nil end
             if hud.error then imgui.text("On-screen readout error: " .. hud.error) end
             imgui.text("Last Heat event: " .. state.last_event)
+            imgui.text("Settings: " .. settings.note)
+            if imgui.button("reset settings to defaults") then reset_settings() end
             imgui.text("Debug (for testing only):")
             local fchanged, fvalue = imgui.checkbox("force P1 Rage on", Engine.debug.force_rage[0])
             if fchanged then Engine.debug.force_rage[0] = fvalue end
@@ -601,6 +681,7 @@ if re ~= nil and sdk ~= nil then
                 for _, name in ipairs(METHOD_ORDER) do
                     if imgui.button("use method: " .. name) then
                         MECH.slowmo_fx.fx_method = name
+                        settings.dirty = true
                         fx.error = nil
                     end
                 end
@@ -608,17 +689,17 @@ if re ~= nil and sdk ~= nil then
             if MECH.slowmo_fx ~= nil then
                 pcall(function()
                     local c1, v1 = imgui.slider_float("slow-motion speed (1.0 = normal)", MECH.slowmo_fx.fx_speed_scale, 0.1, 1.0)
-                    if c1 then MECH.slowmo_fx.fx_speed_scale = v1 end
+                    if c1 then MECH.slowmo_fx.fx_speed_scale = v1; settings.dirty = true end
                     local c2, v2 = imgui.slider_int("slow-motion length (frames)", MECH.slowmo_fx.fx_frames, 5, 120)
-                    if c2 then MECH.slowmo_fx.fx_frames = v2 end
+                    if c2 then MECH.slowmo_fx.fx_frames = v2; settings.dirty = true end
                 end)
             end
             if MECH.hitstop_boost ~= nil then
                 pcall(function()
                     local c3, v3 = imgui.slider_int("hit freeze boost (frames)", MECH.hitstop_boost.boost_frames, 0, 20)
-                    if c3 then MECH.hitstop_boost.boost_frames = v3 end
+                    if c3 then MECH.hitstop_boost.boost_frames = v3; settings.dirty = true end
                     local c4, v4 = imgui.slider_int("big hit freeze boost (frames)", MECH.hitstop_boost.big_boost_frames, 0, 40)
-                    if c4 then MECH.hitstop_boost.big_boost_frames = v4 end
+                    if c4 then MECH.hitstop_boost.big_boost_frames = v4; settings.dirty = true end
                 end)
                 imgui.text(string.format("Hit freeze boosts applied: %d", stats.freeze_boosts))
                 if stats.freeze_error then imgui.text("Hit freeze error: " .. stats.freeze_error) end

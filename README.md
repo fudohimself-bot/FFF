@@ -2,15 +2,19 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: Rage verified in game. Heat was just redesigned to follow Tekken 8 and is untested.** In real offline matches (2026-10-07) every field the mod needs read correctly, health writes were kept, Rage turned on at low health, and the first version of Heat (+15% damage, cooldown, permanent chip, F1 key) worked. The new Heat has not been played yet: once per round, a timer that stops while the opponent is in hitstun (this reads a field, `damage_time`, whose values we have not seen), and chip that cannot KO and is won back by landing attacks. Not built: juggle scaling, and Tekken's Heat Smash, Heat Dash, Heat Burst input and Engager moves (they are move-set changes). The rules are also tested against a fake match and a fake REFramework (58 tests).
+**Status: first versions verified in game; the Tekken 8 versions are untested.** In real offline matches (2026-10-07) every field the mod needs read correctly, health writes were kept, and an earlier Rage (20%, +15%) and Heat (+15%, cooldown, permanent chip, F1 key) both worked. Since then both were redesigned to follow Tekken 8, and an on-screen readout and a button-bit readout were added; none of that has been played yet. The rules are tested against a fake match and a fake REFramework (66 tests).
 
 ## What it adds
 
 | System | What it does | Status |
 |---|---|---|
-| Rage | A fighter at or under 20% health deals 15% more damage (a Tekken-flavoured guess, not Tekken's exact numbers) | built, verified in game |
-| Heat | P1 presses **F1** (P2 **F2**) to start Heat: once per round, 10 seconds of running time that stops while the opponent is in hitstun. No damage bonus. A blocked hit costs the blocker chip damage (2% of max health, an estimate) that can't KO and is won back when they land attacks. Keyboard only: REFramework can't read gamepad buttons | redesigned to follow Tekken 8, untested in game |
+| Rage | Tekken 8 season 3: at or under 25% health, every hit deals 10% more damage (rounded down) and you take 70% less chip damage | built, untested in game |
+| Heat | P1 presses **F1** (P2 **F2**): once per round, 10 seconds of running time that stops while the opponent is in hitstun. No damage bonus. Blocked hits chip the blocker (2% of max health, an estimate) | built, untested in game |
+| Recoverable health | Heat chip can't KO and is won back (1% of max health per landed attack, an estimate) when the chipped fighter lands attacks. A hit on a fighter not in Heat eats 30% of its damage from their recoverable health | built, untested in game |
+| On-screen readout | Heat bar, Rage and recoverable health for both fighters, from the mod itself | built, untested in game |
 | Juggle scaling | Longer air combos | research only, not built |
+
+**Not possible in this mod** (they need new moves, animations or movement, not state changes): Heat Smash, Heat Dash, Heat Burst as a 2+3 input, Heat Engager moves, Rage Art, sidesteps, Tekken's four-button layout and a Tekken move list for any SF6 fighter. **Possible but needs more research:** wall carry and bounce tuning, and starting Heat from a gamepad button combo (the panel shows the game's raw held-button bits so they can be decoded).
 
 Both built systems add their bonus by lowering the victim's health after a hit. SF6 accepted these writes in real offline matches. What isn't known yet is how the game's rollback system behaves over a long session, and whether the on-screen health bar always follows the written value.
 

@@ -133,6 +133,23 @@ local HOOKS = {
     ["read_verified"] = false,
     ["write_verified"] = "n/a",
     ["evidence"] = "Field name seen in the probe's field list; its value during hitstun has not been seen yet."
+  },
+  {
+    ["id"] = "button_state",
+    ["kind"] = "field",
+    ["path_steps"] = {
+      "Player",
+      "mcPlayer",
+      "[i]",
+      "pl_sw_now"
+    },
+    ["access"] = "r",
+    ["value_type"] = "int",
+    ["purpose"] = "The game's own held-button bits for each fighter, so Heat can later be started from a gamepad button combo (Tekken's Heat Burst is 2+3) instead of only a keyboard key",
+    ["source"] = "Fighter field list from the probe; the meaning of the bits is not known yet",
+    ["read_verified"] = false,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Field name seen in the probe's field list. Which bit is which button is unknown: the panel shows the live value so the bits can be decoded."
   }
 }
 

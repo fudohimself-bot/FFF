@@ -80,12 +80,12 @@ class EngineRules(unittest.TestCase):
         self.assertEqual(self.hit(1, 100), {})
 
     def test_rage_adds_bonus_damage_below_threshold(self):
-        self.m.tick(hp=[190, 1000])  # P1 (index 0) at 19%, under the 20% line
-        writes = self.hit(1, 100)  # rage x1.15 -> 115 total, so 15 extra
-        self.assertEqual(writes, {1: 885})
+        self.m.tick(hp=[190, 1000])  # P1 (index 0) at 19%, under the 25% line
+        writes = self.hit(1, 100)  # Rage +10% -> 110 total, so 10 extra
+        self.assertEqual(writes, {1: 890})
 
     def test_rage_not_active_above_threshold(self):
-        self.m.tick(hp=[250, 1000])  # 25%
+        self.m.tick(hp=[300, 1000])  # 30%
         self.assertEqual(self.hit(1, 100), {})
 
     def test_rage_off_when_disabled(self):
@@ -180,7 +180,7 @@ class EngineRules(unittest.TestCase):
         self.m.tick(hp=[100, 1000])  # P1 enters Rage
         self.m.hp[1] -= 100
         self.assertEqual(self.m.tick(advance=False), {})  # same timer value: not processed yet
-        self.assertEqual(self.m.tick(), {1: 885})  # the next match tick applies the bonus once
+        self.assertEqual(self.m.tick(), {1: 890})  # the next match tick applies the bonus once
         self.assertEqual(self.m.tick(advance=False), {})
         self.assertEqual(self.m.tick(), {})
 
@@ -199,7 +199,7 @@ class EngineRules(unittest.TestCase):
         self.m.tick(hp=[100, 1000])  # P1 in Rage
         self.m.tick(keys=[True, False])
         self.m.tick(keys=[False, False])
-        self.assertEqual(self.hit(1, 100), {1: 885})  # only Rage's 15%
+        self.assertEqual(self.hit(1, 100), {1: 890})  # only Rage's 15%
 
     def test_chip_cannot_ko_and_is_recoverable(self):
         self.m.tick(keys=[True, False])
@@ -242,6 +242,58 @@ class EngineRules(unittest.TestCase):
         self.m.tick(guard=[0, 0])
         self.m.tick(guard=[0, 12])  # P2's block starts: P1 landed an attack, regains
         self.assertEqual(self.m.hp[0], 990)
+
+
+class TekkenAccuracy(unittest.TestCase):
+    def setUp(self):
+        self.lua, self.g = load_engine()
+        self.m = Match(self.lua, self.g)
+        self.m.tick()
+
+    def hit(self, victim, damage):
+        self.m.hp[victim] -= damage
+        return self.m.tick()
+
+    def heat_on(self, i=0):
+        keys = [False, False]
+        keys[i] = True
+        self.m.tick(keys=keys)
+        self.m.tick(keys=[False, False])
+
+    def test_rage_threshold_is_a_quarter_of_max_health(self):
+        self.m.tick(hp=[250, 1000])  # exactly 25%: Rage
+        self.assertTrue(self.m.state["p"][0]["rage"])
+        self.m.tick(hp=[251, 1000])
+        self.assertFalse(self.m.state["p"][0]["rage"])
+
+    def test_rage_bonus_is_ten_percent_rounded_down(self):
+        self.m.tick(hp=[100, 1000])
+        self.assertEqual(self.hit(1, 109), {1: 1000 - 109 - 10})  # 10.9 -> 10
+        self.assertEqual(self.hit(1, 9), {})  # 0.9 -> 0, no write
+
+    def test_rage_cuts_chip_taken_by_seventy_percent(self):
+        self.heat_on(1)  # P2 in Heat
+        self.m.tick(hp=[200, 1000])  # P1 in Rage (20%)
+        writes = self.m.tick(guard=[12, 0])  # P1 blocks P2's Heat attack: 20 * 0.3 = 6
+        self.assertEqual(writes, {0: 194})
+
+    def test_hit_eats_recoverable_health_when_not_in_heat(self):
+        self.heat_on(0)
+        self.m.tick(guard=[0, 12])  # P2 chipped: pool 20
+        self.m.tick(guard=[0, 0])
+        self.hit(1, 40)  # 30% of 40 = 12 off the pool (P1's attack landing also wins back 10 first)
+        self.assertEqual(self.m.state["p"][1]["pool"], 20 - 12 - 0)
+
+    def test_hit_does_not_eat_recoverable_health_while_in_heat(self):
+        self.heat_on(0)
+        self.heat_on(1)
+        self.m.tick(guard=[0, 12])
+        self.assertGreater(self.m.state["p"][1]["pool"], 0)
+        self.m.tick(guard=[0, 0])
+        pool = self.m.state["p"][1]["pool"]
+        self.m.hp[1] -= 40
+        self.m.tick()
+        self.assertEqual(self.m.state["p"][1]["pool"], pool)
 
 
 class RoundAndDebug(unittest.TestCase):
@@ -293,7 +345,7 @@ class RoundAndDebug(unittest.TestCase):
         self.g.Engine.debug.force_rage[0] = True
         self.m.tick()
         self.m.hp[1] -= 100
-        self.assertEqual(self.m.tick(), {1: 885})
+        self.assertEqual(self.m.tick(), {1: 890})
 
     def test_debug_start_heat_without_key(self):
         self.g.Engine.start_heat(self.m.state, 0)
@@ -313,7 +365,7 @@ class RealMaxHealth(unittest.TestCase):
         self.m.tick()
         self.m.tick()
         self.m.hp[1] -= 100
-        self.assertEqual(self.m.tick(), {1: 885})  # P1 at 15% of the real max is in Rage
+        self.assertEqual(self.m.tick(), {1: 890})  # P1 at 15% of the real max is in Rage
 
     def test_fallback_without_game_max_would_miss_that_rage(self):
         self.m.hp = [150, 1000]  # no hp_max given
@@ -400,8 +452,8 @@ FAKE_REFRAMEWORK = r"""
 -- A fake REFramework: just enough of re / sdk / imgui / json / reframework for the glue code to run.
 fake = { frame_cbs = {}, ui_cbs = {}, saved = {}, keys = {}, ui_text = {}, clicks = {} }
 players = {
-  [0] = { vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
-  [1] = { vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
+  [0] = { pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
+  [1] = { pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
 }
 battle = {
   Round = { RoundNo = 1 }, Game = { stage_timer = 0 },
@@ -421,7 +473,11 @@ imgui = {
   text = function(t) table.insert(fake.ui_text, t) end,
   checkbox = function(label, v) return false, v end,
   button = function(label) return fake.press == label end,
+  begin_window = function(name) fake.window = name; return true end, end_window = function() end,
+  progress_bar = function(frac, size, text) table.insert(fake.bars, { frac = frac, text = text }) end,
 }
+Vector2f = { new = function(x, y) return { x = x, y = y } end }
+fake.bars = {}
 json = { dump_file = function(path, tbl) fake.saved[path] = tbl; return true end }
 """
 
@@ -443,7 +499,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.frame(lua)  # P1 enters Rage
         lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 2")  # P2 takes 100
         self.frame(lua)
-        self.assertEqual(lua.eval("players[1].vital_new"), 885)
+        self.assertEqual(lua.eval("players[1].vital_new"), 890)
 
     def test_mod_starts_heat_from_keyboard(self):
         lua = self.boot("sf6_tekken_mode.lua")
@@ -473,7 +529,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.frame(lua)
         lua.execute("players[1].vital_new = 9000; battle.Game.stage_timer = 2")
         self.frame(lua)
-        self.assertEqual(lua.eval("players[1].vital_new"), 8850)
+        self.assertEqual(lua.eval("players[1].vital_new"), 8900)
 
     def test_mod_survives_missing_vital_max(self):
         lua = self.boot("sf6_tekken_mode.lua")
@@ -505,7 +561,43 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.frame(lua)
         lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
         joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
-        self.assertIn("Bonus health writes: 1 (last: P2 health 900 -> 885)", joined)
+        self.assertIn("Bonus health writes: 1 (last: P2 health 900 -> 890)", joined)
+
+    def test_hud_draws_a_heat_bar_and_survives_a_broken_imgui(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("fake.keys[112] = true; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.keys[112] = false; fake.bars = {}; battle.Game.stage_timer = 2")
+        self.frame(lua)
+        bars = list(lua.eval("fake.bars").values())
+        self.assertEqual(len(bars), 1)
+        self.assertIn("P1 HEAT", bars[0]["text"])
+        lua.execute("imgui.progress_bar = function() error('no such function') end; battle.Game.stage_timer = 3")
+        self.frame(lua)  # must not raise, and must not break the rules
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertIn("On-screen readout error", joined)
+        self.assertIn("P1  rage: false  heat: true", joined)
+
+    def test_panel_shows_held_game_buttons_in_bits(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("players[0].pl_sw_now = 5; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertIn("Held buttons (game bits) P1 5 [000000000101]", joined)
+
+    def test_mod_survives_missing_button_field(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("players[0].pl_sw_now = nil")
+        self.frame(lua)
+        lua.execute("battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertNotIn("Last error", joined)
 
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")

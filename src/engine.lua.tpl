@@ -136,12 +136,18 @@ function Engine.step(st, snap)
             if enabled("rage") and st.p[a].rage then mult = mult * MECH.rage.damage_mult end
             if enabled("heat") and Engine.heat_active(st, a) then mult = mult * MECH.heat.damage_mult end
             if mult > 1.0 then
-                local extra = round_half_up(drop * (mult - 1.0))
+                local extra = math.floor(drop * (mult - 1.0) + 1e-9)  -- Tekken rounds the bonus down
                 local new_hp = math.max(0, hp[v] - extra)
                 if new_hp ~= hp[v] then
                     hp[v] = new_hp
                     writes[v] = new_hp
                 end
+            end
+            -- A hit on a fighter who is not in Heat eats into their recoverable health.
+            if enabled("heat") and not Engine.heat_active(st, v) and st.p[v].pool > 0 then
+                local total = last - hp[v]
+                local trim = round_half_up(total * MECH.heat.hit_trims_recoverable_pct / 100.0)
+                st.p[v].pool = math.max(0, st.p[v].pool - trim)
             end
         end
     end
@@ -156,7 +162,11 @@ function Engine.step(st, snap)
             if enabled("heat") and Engine.heat_active(st, a) then
                 local floor_hp = MECH.heat.chip_can_ko and 0 or 1
                 if hp[v] > floor_hp then
-                    local chip = round_half_up(st.p[v].max_hp * MECH.heat.chip_pct_of_max / 100.0)
+                    local chip = st.p[v].max_hp * MECH.heat.chip_pct_of_max / 100.0
+                    if enabled("rage") and st.p[v].rage then
+                        chip = chip * (1.0 - MECH.rage.chip_taken_reduction_pct / 100.0)  -- Rage: 70% less chip taken
+                    end
+                    chip = round_half_up(chip)
                     local new_hp = math.max(floor_hp, hp[v] - chip)
                     if new_hp ~= hp[v] then
                         st.p[v].pool = st.p[v].pool + (hp[v] - new_hp)
@@ -212,7 +222,8 @@ if re ~= nil and sdk ~= nil then
     local state = Engine.new_state()
     local last_error = nil
     local last_status = "waiting for a match"
-    local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 } }
+    local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 } }
+    local hud = { show = true, error = nil }
 
     local function num(v)
         local n = tonumber(v)
@@ -226,7 +237,7 @@ if re ~= nil and sdk ~= nil then
         local round = t:get_field("Round"):get_data(nil).RoundNo
         local timer = t:get_field("Game"):get_data(nil).stage_timer
         local players = t:get_field("Player"):get_data(nil).mcPlayer
-        local snap = { round = num(round), timer = num(timer), hp = {}, hp_max = {}, guard = {}, hitstun = {}, keys = {} }
+        local snap = { round = num(round), timer = num(timer), hp = {}, hp_max = {}, guard = {}, hitstun = {}, buttons = {}, keys = {} }
         for i = 0, 1 do
             snap.hp[i] = num(players[i].vital_new)
             snap.guard[i] = num(players[i].guard_time)
@@ -234,10 +245,40 @@ if re ~= nil and sdk ~= nil then
             snap.hp_max[i] = ok_max and num(mx) or 0
             local ok_hs, hs = pcall(function() return players[i].damage_time end)
             snap.hitstun[i] = ok_hs and num(hs) or 0
+            local ok_bt, bt = pcall(function() return players[i].pl_sw_now end)
+            snap.buttons[i] = ok_bt and num(bt) or 0
         end
         snap.keys[0] = reframework:is_key_down(MECH.heat.key_p1) == true
         snap.keys[1] = reframework:is_key_down(MECH.heat.key_p2) == true
         return snap, players
+    end
+
+    local function bits(n)
+        n = math.floor(n)
+        local out = {}
+        for k = 11, 0, -1 do out[#out + 1] = tostring(math.floor(n / 2 ^ k) % 2) end
+        return table.concat(out)
+    end
+
+    -- Small on-screen readout of Heat time, Rage and recoverable health for both fighters.
+    local function draw_hud()
+        if not hud.show then return end
+        imgui.begin_window("Tekken Heat", true, 0)
+        for i = 0, 1 do
+            local p = state.p[i]
+            local label = string.format("P%d", i + 1)
+            if Engine.heat_active(state, i) then
+                local frac = p.heat_left / MECH.heat.duration_ticks
+                imgui.progress_bar(frac, Vector2f.new(220, 14), string.format("%s HEAT %.1fs", label, p.heat_left / 60.0))
+            elseif p.heat_used then
+                imgui.text(label .. " Heat used this round")
+            else
+                imgui.text(label .. " Heat ready")
+            end
+            if p.rage then imgui.text(label .. " RAGE") end
+            if p.pool > 0 then imgui.text(string.format("%s recoverable %d", label, p.pool)) end
+        end
+        imgui.end_window()
     end
 
     re.on_frame(function()
@@ -257,9 +298,13 @@ if re ~= nil and sdk ~= nil then
             return
         end
         last_status = "running (round " .. tostring(snap.round) .. ")"
+        local okh, errh = pcall(draw_hud)
+        hud.error = (not okh) and tostring(errh) or nil
+        if not okh then hud.show = false end  -- stop retrying a readout that errors every frame
         for i = 0, 1 do
             stats.guard_now[i] = snap.guard[i]
             if snap.guard[i] > stats.guard_max[i] then stats.guard_max[i] = snap.guard[i] end
+            stats.btn_now[i] = snap.buttons[i]
             stats.hit_now[i] = snap.hitstun[i]
             if snap.hitstun[i] > stats.hit_max[i] then stats.hit_max[i] = snap.hitstun[i] end
         end
@@ -288,6 +333,11 @@ if re ~= nil and sdk ~= nil then
             end
             imgui.text(string.format("Hitstun timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 stats.hit_now[0], stats.hit_now[1], stats.hit_max[0], stats.hit_max[1]))
+            imgui.text(string.format("Held buttons (game bits) P1 %d [%s]  P2 %d [%s]",
+                stats.btn_now[0], bits(stats.btn_now[0]), stats.btn_now[1], bits(stats.btn_now[1])))
+            local hchanged, hvalue = imgui.checkbox("show on-screen Heat / Rage readout", hud.show)
+            if hchanged then hud.show = hvalue; hud.error = nil end
+            if hud.error then imgui.text("On-screen readout error: " .. hud.error) end
             imgui.text("Last Heat event: " .. state.last_event)
             imgui.text("Debug (for testing only):")
             local fchanged, fvalue = imgui.checkbox("force P1 Rage on", Engine.debug.force_rage[0])

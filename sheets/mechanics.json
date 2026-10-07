@@ -1,6 +1,6 @@
 {
   "sheet": "mechanics",
-  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet.",
+  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here).",
   "columns": [
     "id",
     "enabled",
@@ -15,6 +15,8 @@
     "pause_while_opponent_in_hitstun",
     "chip_can_ko",
     "recover_pct_of_max_per_landed_attack",
+    "chip_taken_reduction_pct",
+    "hit_trims_recoverable_pct",
     "key_p1",
     "key_p2",
     "uses_hooks",
@@ -28,8 +30,8 @@
       "enabled": true,
       "kind": "rage",
       "trigger": "hp_below",
-      "hp_threshold_pct": 20,
-      "damage_mult": 1.15,
+      "hp_threshold_pct": 25,
+      "damage_mult": 1.1,
       "duration_ticks": "n/a",
       "cooldown_ticks": "n/a",
       "chip_pct_of_max": "n/a",
@@ -37,6 +39,8 @@
       "pause_while_opponent_in_hitstun": "n/a",
       "chip_can_ko": "n/a",
       "recover_pct_of_max_per_landed_attack": "n/a",
+      "chip_taken_reduction_pct": 70,
+      "hit_trims_recoverable_pct": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -46,8 +50,8 @@
         "hp_max"
       ],
       "status": "implemented",
-      "verified": true,
-      "note": "Tekken Rage: while a fighter is at or under the health threshold, their hits deal extra damage. Bonus is applied by lowering the victim's health after a hit. In-game 2026-10-07: Rage state turned true at low health and false after health reset; with Rage forced on, a hit logged P2 9040 -> 8896 (+15%). The two halves were seen separately; the natural low-health trigger and the bonus use the same flag."
+      "verified": false,
+      "note": "Tekken 8 Rage: at or under 25% health (45 of 180), every hit deals 10% more damage (rounded down) and chip damage taken is cut by 70%. Not possible here: Rage Art. The earlier numbers (20%, +15%) were verified working in game; these new numbers are untested."
     },
     {
       "id": "heat",
@@ -63,6 +67,8 @@
       "pause_while_opponent_in_hitstun": true,
       "chip_can_ko": false,
       "recover_pct_of_max_per_landed_attack": 1.0,
+      "chip_taken_reduction_pct": "n/a",
+      "hit_trims_recoverable_pct": 30,
       "key_p1": 112,
       "key_p2": 113,
       "uses_hooks": [
@@ -72,7 +78,8 @@
         "hp_max",
         "guard_time",
         "hitstun",
-        "key_state"
+        "key_state",
+        "button_state"
       ],
       "status": "implemented",
       "verified": false,
@@ -92,6 +99,8 @@
       "pause_while_opponent_in_hitstun": "n/a",
       "chip_can_ko": "n/a",
       "recover_pct_of_max_per_landed_attack": "n/a",
+      "chip_taken_reduction_pct": "n/a",
+      "hit_trims_recoverable_pct": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [

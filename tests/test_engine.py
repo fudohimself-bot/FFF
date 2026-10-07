@@ -131,6 +131,7 @@ class EngineRules(unittest.TestCase):
         self.m.tick(keys=[False, False])
         writes = self.m.tick(guard=[0, 12])  # P2 starts blocking; chip = 2% of 1000 = 20
         self.assertEqual(writes, {1: 980})
+        self.assertEqual(self.m.state["chip_count"], 1)
         self.assertEqual(self.m.tick(guard=[0, 11]), {})  # blockstun continues: no second chip
 
     def test_chip_never_kills(self):
@@ -379,6 +380,17 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
         joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
         self.assertNotIn("Last error", joined)
+
+    def test_ui_shows_block_timer_readouts(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("players[1].guard_time = 14; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("players[1].guard_time = 0; battle.Game.stage_timer = 2")
+        self.frame(lua)
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertIn("Chip hits: 0   block timer now P1 0 / P2 0, highest seen P1 0 / P2 14", joined)
 
     def test_ui_counts_bonus_writes(self):
         lua = self.boot("sf6_tekken_mode.lua")

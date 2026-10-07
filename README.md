@@ -2,14 +2,14 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: game access verified, Rage and Heat not yet played.** In the real game (2026-10-07) the probe read every field it needs (health, max health, block timer, match timer, round number, keyboard) and a test write of 1 health point was kept by the game. What is still unproven is the mod's behaviour in an actual fight: that Rage and Heat bonuses land on real hits, that Heat's key works, and that chip damage triggers on a block. The rules are tested against a fake match and a fake REFramework (41 tests).
+**Status: Rage verified in game, Heat partly.** In the real game (2026-10-07) every field the mod needs reads correctly, health writes are kept, Rage turns on at low health, and forced-Rage and Heat hits both logged a +15% bonus. Still untested in a fight: Heat's F1 key and the chip damage on a blocked hit. The rules are also tested against a fake match and a fake REFramework (46 tests).
 
 ## What it adds
 
 | System | What it does | Status |
 |---|---|---|
-| Rage | A fighter at or under 20% health deals 15% more damage | built, untested in game |
-| Heat | P1 presses **F1** (P2 **F2**) for 10 seconds of +15% damage and chip damage on blocked hits, then a 20 second cooldown. Keyboard only: REFramework can't read gamepad buttons | built, untested in game |
+| Rage | A fighter at or under 20% health deals 15% more damage | built, verified in game |
+| Heat | P1 presses **F1** (P2 **F2**) for 10 seconds of +15% damage and chip damage on blocked hits, then a 20 second cooldown. Keyboard only: REFramework can't read gamepad buttons | built, bonus verified in game; key and chip untested |
 | Juggle scaling | Longer air combos | research only, not built |
 
 Both built systems add their bonus by lowering the victim's health after a hit. Whether SF6 lets a script write health this way, and whether its rollback system overwrites it, is exactly what still has to be checked.

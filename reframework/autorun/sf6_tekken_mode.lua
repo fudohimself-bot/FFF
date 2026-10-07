@@ -23,8 +23,8 @@ local ROWS = {
         "hp_max"
       },
       ["status"] = "implemented",
-      ["verified"] = false,
-      ["note"] = "Tekken Rage: while a fighter is at or under the health threshold, their hits deal extra damage. Bonus is applied by lowering the victim's health after a hit."
+      ["verified"] = true,
+      ["note"] = "Tekken Rage: while a fighter is at or under the health threshold, their hits deal extra damage. Bonus is applied by lowering the victim's health after a hit. In-game 2026-10-07: Rage state turned true at low health and false after health reset; with Rage forced on, a hit logged P2 9040 -> 8896 (+15%). The two halves were seen separately; the natural low-health trigger and the bonus use the same flag."
     },
     {
       ["id"] = "heat",
@@ -48,7 +48,7 @@ local ROWS = {
       },
       ["status"] = "implemented",
       ["verified"] = false,
-      ["note"] = "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) for a timed burst of extra damage plus chip damage on blocked hits, then a cooldown. Ticks are match ticks, about 60 per second. Keyboard only."
+      ["note"] = "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) for a timed burst of extra damage plus chip damage on blocked hits, then a cooldown. Ticks are match ticks, about 60 per second. Keyboard only. In-game 2026-10-07: starting Heat from the debug button logged a +15% bonus (P2 8176 -> 8046). The F1 key and chip damage on block are still untested."
     }
   },
   ["hooks"] = {
@@ -183,7 +183,7 @@ local function new_player()
 end
 
 function Engine.new_state()
-    return { round = nil, last_timer = nil, tick = 0, p = { [0] = new_player(), [1] = new_player() } }
+    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, p = { [0] = new_player(), [1] = new_player() } }
 end
 
 local function enabled(id)
@@ -281,6 +281,7 @@ function Engine.step(st, snap)
                 if new_hp ~= hp[v] then
                     hp[v] = new_hp
                     writes[v] = new_hp
+                    st.chip_count = st.chip_count + 1
                 end
             end
         end
@@ -312,7 +313,7 @@ if re ~= nil and sdk ~= nil then
     local state = Engine.new_state()
     local last_error = nil
     local last_status = "waiting for a match"
-    local stats = { writes = 0, last = "none yet" }
+    local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 } }
 
     local function num(v)
         local n = tonumber(v)
@@ -355,6 +356,10 @@ if re ~= nil and sdk ~= nil then
             return
         end
         last_status = "running (round " .. tostring(snap.round) .. ")"
+        for i = 0, 1 do
+            stats.guard_now[i] = snap.guard[i]
+            if snap.guard[i] > stats.guard_max[i] then stats.guard_max[i] = snap.guard[i] end
+        end
         for i, new_hp in pairs(writes) do
             local before = snap.hp[i]
             local ok3, err = pcall(function() players[i].vital_new = new_hp end)
@@ -372,6 +377,8 @@ if re ~= nil and sdk ~= nil then
             imgui.text("Status: " .. last_status)
             if last_error then imgui.text("Last error: " .. last_error) end
             imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
+            imgui.text(string.format("Chip hits: %d   block timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
+                state.chip_count, stats.guard_now[0], stats.guard_now[1], stats.guard_max[0], stats.guard_max[1]))
             for _, id in ipairs({ "rage", "heat" }) do
                 local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                 if changed then MECH[id].enabled = value end

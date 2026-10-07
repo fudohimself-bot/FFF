@@ -281,7 +281,7 @@ local ROWS = {
       },
       ["status"] = "implemented",
       ["verified"] = false,
-      ["note"] = "Tekken 8 style Heat gauge, one per fighter, drawn on the game screen: P1 on the left, P2 on the right. While Heat runs it is an orange bar that drains over 10 seconds with the seconds left shown; it turns pale blue while the timer is paused (the opponent is being hit) and flashes red under 25%. When Heat is available it is a thin outline labelled HEAT. A thin bar under it shows recoverable health, and labels show RAGE, HEAT SMASH ARMED and RAGE ART ARMED. Position and size are adjustable in the panel and saved. Untested in game: the default position is a guess."
+      ["note"] = "Tekken 8 style Heat gauge, one per fighter, drawn on the game screen: P1 on the left, P2 on the right. While Heat runs it is an orange bar that drains over 10 seconds with the seconds left shown; it turns pale blue while the timer is paused (the opponent is being hit) and flashes red under 25%. When Heat is available it is a thin outline labelled HEAT. A thin bar under it shows recoverable health, and labels show RAGE, HEAT SMASH ARMED and RAGE ART ARMED. Position and size are adjustable in the panel and saved. Untested in game: the default position is a guess. Art style (restyled after the user asked for a Tekken look): slanted angular bars (P1 leans one way, P2 the other), three stacked colour bands for a lit top edge, a soft glow, one tick per second, a bright leading edge, a white flash when Heat starts, and an empty-tank look when Heat is available. The look is from memory of Tekken 8's Heat gauge, not from a reference image; it was checked only by painting the draw calls over a screenshot."
     }
   },
   ["hooks"] = {
@@ -619,6 +619,7 @@ function Engine.gauge_model(st, i)
         seconds = p.heat_left / 60.0,
         paused = active and p.heat_pausing == true,
         available = not p.heat_used,
+        flash = active and math.max(0.0, (p.heat_left - (duration - 12)) / 12.0) or 0,  -- 1 -> 0 over the first 12 ticks
         smash = p.smash_left > 0,
         art = p.art_left > 0,
         rage = p.rage == true,
@@ -1102,47 +1103,98 @@ if re ~= nil and sdk ~= nil then
     end
 
     -- Heat gauge painted straight onto the game screen with REFramework's draw API. Colours are 0xAABBGGRR.
-    local COLOR = {
-        bg = 0xC0101010, edge = 0xFFE6E6E6, edge_dim = 0x90A0A0A0, text = 0xFFFFFFFF, text_dim = 0xA0D0D0D0,
-        heat = 0xFF1E9BFF, low = 0xFF1E1EE6, paused = 0xFFFFDCAA, rage = 0xFF3C3CFF, pool = 0xD0F0F0F0,
+    -- Styled after Tekken's UI: slanted angular shapes, a lit top edge fading to a darker base (three stacked bands),
+    -- a soft glow, one tick per second and a bright leading edge on the draining end.
+    local THEME = {
+        heat   = { top = 0xFF4DD2FF, mid = 0xFF1E9BFF, bot = 0xFF0A5FE0, glow = 0x1E9BFF },
+        paused = { top = 0xFFFFF0D8, mid = 0xFFFFDCAA, bot = 0xFFE0B070, glow = 0xFFDCAA },
+        low    = { top = 0xFF5050FF, mid = 0xFF1E1EE6, bot = 0xFF0A0AA0, glow = 0x1E1EE6 },
     }
+    local COLOR = {
+        backing = 0xD0141414, edge = 0xFFF2F2F2, edge_dim = 0x90B0B0B0, tick = 0x70000000, lead = 0xFFFFFFFF,
+        text = 0xFFFFFFFF, text_dim = 0xA0D0D0D0, rage = 0xFF3C3CFF, pool = 0xD0F0F0F0, flash = 0xFFFFFFFF,
+    }
+
+    local function with_alpha(rgb, a)
+        return math.floor(a) * 0x1000000 + rgb
+    end
 
     local function draw_gauge(i, screen_w, screen_h)
         local g = MECH.heat_gauge
         local w = screen_w * g.gauge_w_pct / 100.0
         local h = g.gauge_h_px
+        local slant = h * 0.9
+        local bw = w - slant  -- width of the bar itself; the slant takes the rest
         local edge = screen_w * g.gauge_edge_pct / 100.0
         local x = (i == 0) and edge or (screen_w - edge - w)
         local y = screen_h * g.gauge_y_pct / 100.0
         local m = Engine.gauge_model(state, i)
         local tag = string.format("P%d", i + 1)
 
-        draw.filled_rect(x - 2, y - 2, w + 4, h + 4, COLOR.bg)
+        -- horizontal shift of the slanted edge at height fraction f (0 = top, 1 = bottom): P1 leans "/", P2 leans "\"
+        local function off(f) if i == 0 then return slant * (1 - f) else return slant * f end end
+        -- a slanted band between base x positions xa..xb and height fractions f0..f1
+        local function band(xa, xb, f0, f1, color)
+            draw.filled_quad(xa + off(f0), y + h * f0, xb + off(f0), y + h * f0,
+                             xb + off(f1), y + h * f1, xa + off(f1), y + h * f1, color)
+        end
+        local function frame(xa, xb, f0, f1, color)
+            draw.outline_quad(xa + off(f0), y + h * f0, xb + off(f0), y + h * f0,
+                              xb + off(f1), y + h * f1, xa + off(f1), y + h * f1, color)
+        end
+
+        local theme
         if m.active then
-            local fw = w * m.fraction
-            local fx = (i == 0) and x or (x + w - fw)  -- each bar drains toward its own screen edge
-            local color = COLOR.heat
-            if m.paused then
-                color = COLOR.paused  -- the timer is stopped while the opponent is being hit
-            elseif m.fraction < 0.25 and math.floor(hud.frame / 6) % 2 == 0 then
-                color = COLOR.low
+            theme = m.paused and THEME.paused or THEME.heat
+            if not m.paused and m.fraction < 0.25 and math.floor(hud.frame / 6) % 2 == 0 then theme = THEME.low end
+            -- soft glow around the whole gauge
+            for k = 1, 3 do
+                local grow = k * 2.5
+                band(x - grow, x + bw + grow, -grow / h, 1 + grow / h, with_alpha(theme.glow, 0x10 + (3 - k) * 0x0C))
             end
-            draw.filled_rect(fx, y, fw, h, color)
+        end
+
+        band(x - 1.5, x + bw + 1.5, -1.5 / h, 1 + 1.5 / h, COLOR.backing)
+
+        if m.active then
+            local xa, xb
+            if i == 0 then xa, xb = x, x + bw * m.fraction else xa, xb = x + bw * (1 - m.fraction), x + bw end
+            band(xa, xb, 0.00, 0.34, theme.top)
+            band(xa, xb, 0.34, 0.67, theme.mid)
+            band(xa, xb, 0.67, 1.00, theme.bot)
+            -- one tick per second of Heat
+            local seconds = math.floor(MECH.heat.duration_ticks / 60)
+            for t = 1, seconds - 1 do
+                local tx = x + bw * t / seconds
+                if tx > xa and tx < xb then
+                    draw.line(tx + off(0), y, tx + off(1), y + h, COLOR.tick)
+                end
+            end
+            -- bright leading edge where the bar is draining
+            local lead_x = (i == 0) and xb or xa
+            draw.line(lead_x + off(0), y, lead_x + off(1), y + h, COLOR.lead)
+            -- white flash when Heat starts
+            if m.flash > 0 then band(x, x + bw, 0, 1, with_alpha(0xFFFFFF, 0xB0 * m.flash)) end
             draw.text(string.format("%s HEAT  %.1f", tag, m.seconds), x + 2, y + h + 5, COLOR.text)
         elseif m.available then
-            draw.text(tag .. " HEAT", x + 2, y + h + 5, COLOR.text_dim)
+            local pulse = 0x50 + 0x30 * (math.floor(hud.frame / 20) % 2)
+            band(x, x + bw, 0.72, 1.0, with_alpha(0xFFFFFF, 0x14))  -- faint lit base: an empty tank
+            draw.text(tag .. " HEAT", x + 2, y + h + 5, with_alpha(0xD0D0D0, pulse + 0x50))
         end
-        draw.outline_rect(x - 2, y - 2, w + 4, h + 4, m.active and COLOR.edge or COLOR.edge_dim)
+        frame(x - 1.5, x + bw + 1.5, -1.5 / h, 1 + 1.5 / h, m.active and COLOR.edge or COLOR.edge_dim)
 
         local ty = y + h + 5
         if m.pool_fraction > 0 then
-            -- recoverable health: a thin bar, full at 20% of max health
-            draw.filled_rect(x, y + h + 5, w * math.min(1.0, m.pool_fraction * 5), 4, COLOR.pool)
+            -- recoverable health: a thin slanted bar, full at 20% of max health
+            local pw = bw * math.min(1.0, m.pool_fraction * 5)
+            local px = (i == 0) and x or (x + bw - pw)
+            draw.filled_quad(px + slant * 0.2, y + h + 5, px + pw + slant * 0.2, y + h + 5,
+                             px + pw, y + h + 9, px, y + h + 9, COLOR.pool)
             ty = ty + 8
         end
         if m.active or m.available then ty = ty + 14 end
         if m.rage then draw.text(tag .. " RAGE", x + 2, ty, COLOR.rage); ty = ty + 14 end
-        if m.smash then draw.text(tag .. " HEAT SMASH ARMED", x + 2, ty, COLOR.heat); ty = ty + 14 end
+        if m.smash then draw.text(tag .. " HEAT SMASH ARMED", x + 2, ty, THEME.heat.mid); ty = ty + 14 end
         if m.art then draw.text(tag .. " RAGE ART ARMED", x + 2, ty, COLOR.rage) end
     end
 

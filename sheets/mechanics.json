@@ -392,7 +392,7 @@
       ],
       "status": "implemented",
       "verified": false,
-      "note": "Tekken 8 style Heat gauge, one per fighter, drawn on the game screen: P1 on the left, P2 on the right. While Heat runs it is an orange bar that drains over 10 seconds with the seconds left shown; it turns pale blue while the timer is paused (the opponent is being hit) and flashes red under 25%. When Heat is available it is a thin outline labelled HEAT. A thin bar under it shows recoverable health, and labels show RAGE, HEAT SMASH ARMED and RAGE ART ARMED. Position and size are adjustable in the panel and saved. Untested in game: the default position is a guess."
+      "note": "Tekken 8 style Heat gauge, one per fighter, drawn on the game screen: P1 on the left, P2 on the right. While Heat runs it is an orange bar that drains over 10 seconds with the seconds left shown; it turns pale blue while the timer is paused (the opponent is being hit) and flashes red under 25%. When Heat is available it is a thin outline labelled HEAT. A thin bar under it shows recoverable health, and labels show RAGE, HEAT SMASH ARMED and RAGE ART ARMED. Position and size are adjustable in the panel and saved. Untested in game: the default position is a guess. Art style (restyled after the user asked for a Tekken look): slanted angular bars (P1 leans one way, P2 the other), three stacked colour bands for a lit top edge, a soft glow, one tick per second, a bright leading edge, a white flash when Heat starts, and an empty-tank look when Heat is available. The look is from memory of Tekken 8's Heat gauge, not from a reference image; it was checked only by painting the draw calls over a screenshot."
     }
   ]
 }

@@ -682,7 +682,8 @@ local function rec(kind) return function(...)
   if fake.draw_error then error("draw refused") end
   table.insert(fake.draws, { kind, ... })
 end end
-draw = { filled_rect = rec("fill"), outline_rect = rec("outline"), text = rec("text") }
+draw = { filled_rect = rec("fill"), outline_rect = rec("outline"), text = rec("text"),
+         filled_quad = rec("fillquad"), outline_quad = rec("outlinequad"), line = rec("line") }
 fake.bars = {}
 json = {
   dump_file = function(path, tbl) if fake.save_error then error("disk full") end fake.saved[path] = tbl; return true end,
@@ -1056,6 +1057,28 @@ class GlueWithFakeREFramework(unittest.TestCase):
     def _draws(self, lua):
         return [list(d.values()) for d in lua.eval("fake.draws").values()]
 
+    def _quads(self, lua, kind="fillquad"):
+        """Each quad as (list of 4 (x, y) points, colour)."""
+        out = []
+        for d in self._draws(lua):
+            if d[0] == kind:
+                v = d[1:]
+                out.append(([(v[0], v[1]), (v[2], v[3]), (v[4], v[5]), (v[6], v[7])], int(v[8])))
+        return out
+
+    def _gauge_geometry(self, lua):
+        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
+        w = 1920 * g.gauge_w_pct / 100
+        h = g.gauge_h_px
+        slant = h * 0.9
+        return {"w": w, "h": h, "slant": slant, "bw": w - slant, "edge": 1920 * g.gauge_edge_pct / 100, "top": 1080 * g.gauge_y_pct / 100}
+
+    def _band_width(self, lua, color):
+        q = [pts for pts, c in self._quads(lua) if c == color]
+        self.assertTrue(q, f"no quad with colour {color:#x}")
+        pts = q[0]
+        return pts[1][0] - pts[0][0], pts
+
     def _start_heat_p1(self, lua):
         self.frame(lua)
         lua.execute("fake.keys[112] = true; battle.Game.stage_timer = 1")
@@ -1066,32 +1089,38 @@ class GlueWithFakeREFramework(unittest.TestCase):
     def test_gauge_for_heat_is_orange_under_p1_and_a_dim_label_under_p2(self):
         lua = self.boot("sf6_tekken_mode.lua")
         self._start_heat_p1(lua)
-        d = self._draws(lua)
-        fills = [x for x in d if x[0] == "fill"]
-        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
-        edge, top, width = 1920 * g.gauge_edge_pct / 100, 1080 * g.gauge_y_pct / 100, 1920 * g.gauge_w_pct / 100
-        self.assertAlmostEqual(fills[0][1], edge - 2)  # P1's background starts at the left margin
-        self.assertAlmostEqual(fills[0][2], top - 2)
-        bar = [f for f in fills if f[5] == 0xFF1E9BFF][0]
-        self.assertAlmostEqual(bar[1], edge)  # starts at the left edge for P1
-        self.assertAlmostEqual(bar[3], width * (599 / 600), places=1)  # nearly full: Heat just started
-        texts = [x[1] for x in d if x[0] == "text"]
+        geo = self._gauge_geometry(lua)
+        width, pts = self._band_width(lua, 0xFF1E9BFF)  # the middle (orange) band
+        self.assertAlmostEqual(width, geo["bw"] * (599 / 600), places=1)  # nearly full: Heat just started
+        left_base = pts[0][0] - geo["slant"] * (1 - 0.34)  # undo the slant to find the bar's base edge
+        self.assertAlmostEqual(left_base, geo["edge"], places=1)  # P1's bar starts at the left margin
+        self.assertLess(pts[0][1], geo["top"] + geo["h"])  # and sits at the gauge height
+        texts = [x[1] for x in self._draws(lua) if x[0] == "text"]
         self.assertTrue(any(t.startswith("P1 HEAT  ") for t in texts), texts)
         self.assertIn("P2 HEAT", texts)  # P2 still has Heat available
 
-    def test_p2_gauge_sits_at_the_right_edge(self):
+    def test_gauge_is_slanted(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._start_heat_p1(lua)
+        geo = self._gauge_geometry(lua)
+        _, pts = self._band_width(lua, 0xFF1E9BFF)
+        top_left, _tr, bottom_right, bottom_left = pts
+        self.assertGreater(top_left[0] - bottom_left[0], 0)  # P1's top edge leans right: "/"
+        self.assertLess(top_left[0] - bottom_left[0], geo["slant"])
+
+    def test_p2_gauge_sits_at_the_right_edge_and_leans_the_other_way(self):
         lua = self.boot("sf6_tekken_mode.lua")
         self.frame(lua)
         lua.execute("fake.keys[113] = true; battle.Game.stage_timer = 1")
         self.frame(lua)
         lua.execute("fake.keys[113] = false; battle.Game.stage_timer = 2; fake.draws = {}")
         self.frame(lua)
-        fills = [x for x in self._draws(lua) if x[0] == "fill"]
-        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
-        edge = 1920 * g.gauge_edge_pct / 100
-        bar = [f for f in fills if f[5] == 0xFF1E9BFF][0]
-        full_right = 1920 - edge
-        self.assertAlmostEqual(bar[1] + bar[3], full_right, places=0)  # drains toward its own (right) edge
+        geo = self._gauge_geometry(lua)
+        _, pts = self._band_width(lua, 0xFF1E9BFF)
+        right_base = pts[1][0] - geo["slant"] * 0.34  # P2 leans "\\": the top edge is not shifted, lower edges are
+        self.assertAlmostEqual(right_base, 1920 - geo["edge"] - geo["slant"], delta=1.0)  # drains toward its own (right) edge
+        top_left, _tr, bottom_right, bottom_left = pts
+        self.assertLess(top_left[0] - bottom_left[0], 0)
 
     def test_gauge_shrinks_as_heat_runs_down(self):
         lua = self.boot("sf6_tekken_mode.lua")
@@ -1099,16 +1128,37 @@ class GlueWithFakeREFramework(unittest.TestCase):
         for n in range(3, 303):
             lua.execute(f"battle.Game.stage_timer = {n}; fake.draws = {{}}")
             self.frame(lua)
-        bar = [x for x in self._draws(lua) if x[0] == "fill" and x[5] == 0xFF1E9BFF][0]
-        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
-        self.assertAlmostEqual(bar[3], 1920 * g.gauge_w_pct / 100 * 0.5, delta=3)
+        geo = self._gauge_geometry(lua)
+        width, _ = self._band_width(lua, 0xFF1E9BFF)
+        self.assertAlmostEqual(width, geo["bw"] * 0.5, delta=3)
+
+    def test_gauge_has_a_tick_per_second_and_a_bright_leading_edge(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._start_heat_p1(lua)
+        lines = [d for d in self._draws(lua) if d[0] == "line"]
+        ticks = [d for d in lines if int(d[5]) == 0x70000000]
+        lead = [d for d in lines if int(d[5]) == 0xFFFFFFFF]
+        self.assertEqual(len(ticks), 9)  # 10 seconds of Heat: nine dividers
+        self.assertEqual(len(lead), 1)
+
+    def test_gauge_glows_while_heat_runs_and_flashes_at_the_start(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._start_heat_p1(lua)
+        colors = [c for _, c in self._quads(lua)]
+        self.assertTrue(any((c >> 24) < 0x40 and (c & 0xFFFFFF) == 0x1E9BFF for c in colors), "no glow quads")
+        self.assertTrue(any((c & 0xFFFFFF) == 0xFFFFFF and (c >> 24) >= 0x60 for c in colors), "no start flash")
+        for n in range(3, 40):  # well past the 12-tick flash
+            lua.execute(f"battle.Game.stage_timer = {n}; fake.draws = {{}}")
+            self.frame(lua)
+        colors = [c for _, c in self._quads(lua)]
+        self.assertFalse(any((c & 0xFFFFFF) == 0xFFFFFF and (c >> 24) >= 0x30 for c in colors), "flash should be over")
 
     def test_gauge_turns_pale_blue_while_the_timer_is_paused(self):
         lua = self.boot("sf6_tekken_mode.lua")
         self._start_heat_p1(lua)
         lua.execute("players[1].damage_time = 20; battle.Game.stage_timer = 3; fake.draws = {}")
         self.frame(lua)
-        colors = [x[5] for x in self._draws(lua) if x[0] == "fill"]
+        colors = [c for _, c in self._quads(lua)]
         self.assertIn(0xFFFFDCAA, colors)
         self.assertNotIn(0xFF1E9BFF, colors)
 
@@ -1120,7 +1170,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
         for n in range(3, 3 + 36):
             lua.execute(f"battle.Game.stage_timer = {n}; fake.draws = {{}}")
             self.frame(lua)
-            seen |= {x[5] for x in self._draws(lua) if x[0] == "fill"}
+            seen |= {c for _, c in self._quads(lua)}
         self.assertIn(0xFF1E1EE6, seen)  # red phase
         self.assertIn(0xFF1E9BFF, seen)  # orange phase
 
@@ -1143,9 +1193,9 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.frame(lua)
         lua.execute("players[1].guard_time = 0; battle.Game.stage_timer = 4; fake.draws = {}")
         self.frame(lua)
-        thin = [x for x in self._draws(lua) if x[0] == "fill" and x[5] == 0xD0F0F0F0]
+        thin = [pts for pts, c in self._quads(lua) if c == 0xD0F0F0F0]
         self.assertTrue(thin, "recoverable bar missing")
-        self.assertEqual(thin[0][4], 4)  # thin: 4 px
+        self.assertEqual(thin[0][2][1] - thin[0][0][1], 4)  # thin: 4 px tall
 
     def test_gauge_shows_a_rage_label_in_red(self):
         lua = self.boot("sf6_tekken_mode.lua")

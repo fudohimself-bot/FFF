@@ -39,7 +39,7 @@ foreach ($t in $GitHubTools) {
   $Dir = Join-Path $Tools $t.Name
   try {
     $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$($t.Repo)/releases/latest" -Headers @{ "User-Agent" = "gojo-elden-ring" }
-    $assets = @($rel.assets | Where-Object { $_.name -match '\.(zip|7z|rar|exe)$' })
+    $assets = @($rel.assets | Where-Object { $_.name -match '\.(zip|7z|rar|exe)$' -and $_.name -notmatch 'linux|osx|macos' })
     if ($assets.Count -eq 0) { throw "no downloadable files in release $($rel.tag_name)" }
     New-Item -ItemType Directory -Force -Path $Dir | Out-Null
     foreach ($a in $assets) {
@@ -57,10 +57,26 @@ foreach ($t in $GitHubTools) {
 }
 
 # Blender 5.1 or newer is what Soulstruct for Blender needs. This is the portable version: no installer, it runs from the folder.
+# download.blender.org can answer scripts with a browser check page, so official mirrors are tried too.
+# The zip is only unpacked if it matches Blender's published SHA-256.
 Write-Host "== Blender 5.1.2 (portable)"
 try {
-  $zip = Join-Path $Tools "blender-5.1.2-windows-x64.zip"
-  Get-File "https://download.blender.org/release/Blender5.1/blender-5.1.2-windows-x64.zip" $zip
+  $name = "blender-5.1.2-windows-x64.zip"
+  $zip = Join-Path $Tools $name
+  $ok = $false
+  foreach ($base in @("https://download.blender.org/release/Blender5.1",
+                      "https://ftp.nluug.nl/pub/graphics/blender/release/Blender5.1",
+                      "https://mirror.clarkson.edu/blender/release/Blender5.1")) {
+    try {
+      Get-File "$base/$name" $zip
+      $sums = Invoke-WebRequest "$base/blender-5.1.2.sha256" -UseBasicParsing
+      $text = if ($sums.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($sums.Content) } else { $sums.Content }
+      $want = (($text -split "`n" | Where-Object { $_ -match [regex]::Escape($name) }) -split '\s+')[0]
+      if ($want -and (Get-FileHash $zip -Algorithm SHA256).Hash -eq $want) { $ok = $true; break }
+      Write-Host "  checksum did not match from $base, trying the next mirror"
+    } catch { Write-Host "  $base failed, trying the next mirror" }
+  }
+  if (-not $ok) { throw "no mirror gave a file matching Blender's checksum" }
   Expand-Any $zip $Tools
   Remove-Item $zip
   Write-Host "  ok: run $Tools\blender-5.1.2-windows-x64\blender.exe"

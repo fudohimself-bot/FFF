@@ -1,6 +1,6 @@
 # Gojo as the Elden Ring player (personal, offline use)
 
-Status: **plan only. Nothing here has been run on a real game yet.** The art work has to happen on your Windows PC with your own copies of Jujutsu Kaisen Cursed Clash and Elden Ring. Keep the extracted and converted files on your PC: they are Bandai Namco's and FromSoftware's assets, so don't share or upload them, and never put them in this repo. Play offline only.
+Status: **steps 1 and 2 done on the user's PC (2026-10-07); the rest is not yet run.** Verified so far: both game folders are where the table below says; the first Cursed Clash AES key opens the packs; `CP_050` is adult Gojo (outfits `SK_CP_050_00` to `_40`, 262 animation files); `SK_CP_050_00` exports as glTF with its PNG textures. All tools are in `D:\GojoMod\tools`, with Blender 5.1.2 and Soulstruct for Blender 3.2.1 installed. The art work has to happen on your Windows PC with your own copies of Jujutsu Kaisen Cursed Clash and Elden Ring. Keep the extracted and converted files on your PC: they are Bandai Namco's and FromSoftware's assets, so don't share or upload them, and never put them in this repo. Play offline only.
 
 ## What the finished mod is
 
@@ -38,7 +38,7 @@ You do **not** need the Cursed Clash UE5 Mod Kit itself (Unreal Engine 5.1, Visu
 2. **Export Gojo.** In FModel's settings, set the model export format to glTF and textures to PNG. Right-click Gojo's skeletal mesh, choose Save Model, and save his textures too.
 3. **Pick the armor set to replace.** Choose a set you already own in your save (or one you can get early). Tell me its name and I'll give you its file numbers: Elden Ring stores each piece as `parts\hd_m_####.partsbnd.dcx` (head), `bd_m_` (body), `am_m_` (arms) and `lg_m_` (legs).
 4. **Unpack Elden Ring** with UXM Selective Unpacker, choosing only the `parts` folder.
-5. **Dump both skeletons.** In Blender, import Gojo's `.gltf` into an empty scene, open the Scripting tab, open `tools/blender/dump_armature.py` from this project and press Run Script. It writes `armature_dump_<name>.json` to your Desktop, named after the Blender file, so save each scene first with its own name (for example `gojo.blend` and `eldenring.blend`). Do the same with the body armor piece imported through Soulstruct for Blender. **Send me both files.** They are small text files.
+5. **Dump both skeletons.** (Gojo's half is done: his bone list was read straight from the exported `.glb`. Only the Elden Ring half is still needed.) In Blender, import Gojo's `.gltf` into an empty scene, open the Scripting tab, open `tools/blender/dump_armature.py` from this project and press Run Script. It writes `armature_dump_<name>.json` to your Desktop, named after the Blender file, so save each scene first with its own name (for example `gojo.blend` and `eldenring.blend`). Do the same with the body armor piece imported through Soulstruct for Blender. **Send me both files.** They are small text files.
 6. **I write the bone map.** From the two dumps I build a table that says which of Gojo's bones follow which Elden Ring bones, and a Blender script that applies it: renames or merges the vertex groups, fits Gojo to the Elden Ring body's height and pose, and drops bones Elden Ring can't use.
 7. **You run my script in Blender,** pose-test the arms and legs, and fix the weights that look wrong.
 8. **Split and export.** Gojo goes into the body piece; the head, arms and legs pieces show his matching parts (or nothing). Export each with Soulstruct for Blender, keeping the original file names.
@@ -83,14 +83,13 @@ Steps:
 
 Order of work: model first, then one combo animation as a pipeline test, then the sorceries, then Domain Expansion last.
 
-## Keeping it light on your PC
+## Model size and textures
 
-A model swap costs almost nothing beyond Elden Ring itself, as long as the model stays near the size of Elden Ring's own armor:
+The user's PC handles the model as it is, so **don't downscale textures or decimate the mesh** to save performance (user's decision, 2026-10-07).
 
-- Keep the whole Gojo model at or under about 60,000 triangles. The dump in step 5 lists each mesh's polygon count; if it's over, I'll add a Decimate step to the step 6 script.
-- Keep his textures at 2048x2048 or smaller.
-- Use one material per piece where possible.
-- The moves are animations and table changes; they cost nothing extra to run. Recoloured Elden Ring effects cost the same as the originals.
+What `SK_CP_050_00` contains (read from the exported `.glb`): 61,725 triangles in 21 parts and 223 bones. About 30,000 of those triangles are the anime outline shells (the materials with `Outline` in the name). They're left out because Elden Ring's shaders would draw them as a solid black skin around him, not to save performance. That leaves about 31,700. Some parts come in `_P1` and `_P2` versions (hair, blindfold, face parts); only one of each set is kept.
+
+Moves are animations and table changes and cost nothing extra to run.
 
 ## Honest expectations
 

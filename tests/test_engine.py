@@ -188,6 +188,29 @@ class RoundAndDebug(unittest.TestCase):
         self.m.tick()
         self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
 
+    def test_heat_expiry_is_recorded_as_normal(self):
+        self.m.tick(keys=[True, False])
+        for _ in range(605):
+            self.m.tick(keys=[False, False])
+        self.assertIn("P1 Heat expired normally after 600 ticks", str(self.m.state["last_event"]))
+
+    def test_heat_cleared_by_reset_is_recorded_with_the_numbers(self):
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.m.timer = 3
+        self.m.tick()
+        ev = str(self.m.state["last_event"])
+        self.assertIn("P1 Heat CLEARED by a reset", ev)
+        self.assertIn("timer 503 -> 4", ev)
+
+    def test_heat_countdown_helpers(self):
+        self.m.tick(keys=[True, False])
+        for _ in range(100):
+            self.m.tick(keys=[False, False])
+        e = self.g.Engine
+        self.assertEqual(e.heat_left(self.m.state, 0), 500)
+        self.assertEqual(e.heat_ready_in(self.m.state, 0), 1700 - 0)
+
     def test_small_timer_wobble_does_not_reset(self):
         self.m.tick(keys=[True, False])
         self.m.tick(keys=[False, False])

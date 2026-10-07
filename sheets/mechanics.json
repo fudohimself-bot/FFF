@@ -1,6 +1,6 @@
 {
   "sheet": "mechanics",
-  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here).",
+  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here). Heat Smash and Rage Art are stand-ins: they are damage bonuses on your next landed hit, armed with a key, not real moves. bonus_pct_of_max, armed_ticks and heat_start_heals_pct_of_pool are my estimates for fun, not Tekken's numbers.",
   "columns": [
     "id",
     "enabled",
@@ -17,6 +17,9 @@
     "recover_pct_of_max_per_landed_attack",
     "chip_taken_reduction_pct",
     "hit_trims_recoverable_pct",
+    "heat_start_heals_pct_of_pool",
+    "armed_ticks",
+    "bonus_pct_of_max",
     "key_p1",
     "key_p2",
     "uses_hooks",
@@ -41,6 +44,9 @@
       "recover_pct_of_max_per_landed_attack": "n/a",
       "chip_taken_reduction_pct": 70,
       "hit_trims_recoverable_pct": "n/a",
+      "heat_start_heals_pct_of_pool": "n/a",
+      "armed_ticks": "n/a",
+      "bonus_pct_of_max": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -69,6 +75,9 @@
       "recover_pct_of_max_per_landed_attack": 1.0,
       "chip_taken_reduction_pct": "n/a",
       "hit_trims_recoverable_pct": 30,
+      "heat_start_heals_pct_of_pool": 50,
+      "armed_ticks": "n/a",
+      "bonus_pct_of_max": "n/a",
       "key_p1": 112,
       "key_p2": 113,
       "uses_hooks": [
@@ -101,6 +110,9 @@
       "recover_pct_of_max_per_landed_attack": "n/a",
       "chip_taken_reduction_pct": "n/a",
       "hit_trims_recoverable_pct": "n/a",
+      "heat_start_heals_pct_of_pool": "n/a",
+      "armed_ticks": "n/a",
+      "bonus_pct_of_max": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -111,6 +123,70 @@
       "status": "research",
       "verified": false,
       "note": "Tekken-style longer juggles by easing SF6's combo damage scaling. Not built: first find out what the probe says about combo_dm_air, and which data controls scaling."
+    },
+    {
+      "id": "heat_smash",
+      "enabled": true,
+      "kind": "heat_smash",
+      "trigger": "heat_key_while_in_heat",
+      "hp_threshold_pct": "n/a",
+      "damage_mult": "n/a",
+      "duration_ticks": "n/a",
+      "cooldown_ticks": "n/a",
+      "chip_pct_of_max": "n/a",
+      "uses_per_round": "n/a",
+      "pause_while_opponent_in_hitstun": "n/a",
+      "chip_can_ko": "n/a",
+      "recover_pct_of_max_per_landed_attack": "n/a",
+      "chip_taken_reduction_pct": "n/a",
+      "hit_trims_recoverable_pct": "n/a",
+      "heat_start_heals_pct_of_pool": "n/a",
+      "armed_ticks": 120,
+      "bonus_pct_of_max": 15,
+      "key_p1": "n/a",
+      "key_p2": "n/a",
+      "uses_hooks": [
+        "round_no",
+        "stage_timer",
+        "hp_now",
+        "hp_max",
+        "key_state"
+      ],
+      "status": "implemented",
+      "verified": false,
+      "note": "Heat Smash stand-in: press the Heat key again while Heat is running to arm it for 2 seconds. The next hit that lands deals extra damage (15% of max health) and uses up your remaining Heat. If it does not land in time, the Heat is spent anyway. A blocked attack does not use it up. Not the real move: no animation, no armor."
+    },
+    {
+      "id": "rage_art",
+      "enabled": true,
+      "kind": "rage_art",
+      "trigger": "key_while_in_rage",
+      "hp_threshold_pct": "n/a",
+      "damage_mult": "n/a",
+      "duration_ticks": "n/a",
+      "cooldown_ticks": "n/a",
+      "chip_pct_of_max": "n/a",
+      "uses_per_round": 1,
+      "pause_while_opponent_in_hitstun": "n/a",
+      "chip_can_ko": "n/a",
+      "recover_pct_of_max_per_landed_attack": "n/a",
+      "chip_taken_reduction_pct": "n/a",
+      "hit_trims_recoverable_pct": "n/a",
+      "heat_start_heals_pct_of_pool": "n/a",
+      "armed_ticks": 120,
+      "bonus_pct_of_max": 18,
+      "key_p1": 114,
+      "key_p2": 115,
+      "uses_hooks": [
+        "round_no",
+        "stage_timer",
+        "hp_now",
+        "hp_max",
+        "key_state"
+      ],
+      "status": "implemented",
+      "verified": false,
+      "note": "Rage Art stand-in: while in Rage, press the key (P1 F3 = 114, P2 F4 = 115) to arm it for 2 seconds, once per round. The next hit that lands deals extra damage (18% of max health), removes the opponent's recoverable health, wins back some of yours, and ends your Rage. If it does not land in time, Rage still ends. Not the real move: no animation or cinematic."
     }
   ]
 }

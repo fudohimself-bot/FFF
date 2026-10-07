@@ -39,6 +39,7 @@ class Match:
         self.hitstun = [0, 0]
         self.send_hitstun = True
         self.keys = [False, False]
+        self.art_keys = [False, False]
 
     def tick(self, advance=True, **kw):
         """One match tick. advance=False repeats the previous timer value, like an extra render frame."""
@@ -47,6 +48,7 @@ class Match:
         for k, v in kw.items():
             setattr(self, k, v)
         extra = {}
+        extra["art_keys"] = self.lua.table_from({0: self.art_keys[0], 1: self.art_keys[1]})
         if self.send_hitstun:
             extra["hitstun"] = self.lua.table_from({0: self.hitstun[0], 1: self.hitstun[1]})
         if self.hp_max is not None:
@@ -294,6 +296,145 @@ class TekkenAccuracy(unittest.TestCase):
         self.m.hp[1] -= 40
         self.m.tick()
         self.assertEqual(self.m.state["p"][1]["pool"], pool)
+
+
+class StandInMoves(unittest.TestCase):
+    """Heat Smash and Rage Art stand-ins, and the Heat-start heal."""
+
+    def setUp(self):
+        self.lua, self.g = load_engine()
+        self.m = Match(self.lua, self.g)
+        self.m.tick()
+
+    def press_heat(self, i=0):
+        keys = [False, False]
+        keys[i] = True
+        self.m.tick(keys=keys)
+        self.m.tick(keys=[False, False])
+
+    def press_art(self, i=0):
+        keys = [False, False]
+        keys[i] = True
+        self.m.tick(art_keys=keys)
+        self.m.tick(art_keys=[False, False])
+
+    def hit(self, victim, damage):
+        self.m.hp[victim] -= damage
+        return self.m.tick()
+
+    def p(self, i):
+        return self.m.state["p"][i]
+
+    # Heat Smash
+    def test_second_heat_press_arms_smash_and_next_hit_deals_bonus_and_spends_heat(self):
+        self.press_heat()
+        self.press_heat()  # second press: armed
+        self.assertGreater(self.p(0)["smash_left"], 0)
+        writes = self.hit(1, 100)  # 100 + 15% of 1000 max = 150 extra
+        self.assertEqual(writes, {1: 1000 - 100 - 150})
+        self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
+        self.assertEqual(self.m.state["smash_count"], 1)
+
+    def test_smash_cannot_be_armed_without_heat(self):
+        self.m.tick(keys=[False, False])
+        self.assertEqual(self.p(0)["smash_left"], 0)
+
+    def test_missed_smash_still_spends_heat(self):
+        self.press_heat()
+        self.press_heat()
+        for _ in range(125):
+            self.m.tick()
+        self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
+        self.assertIn("Heat Smash MISSED", str(self.m.state["last_event"]))
+
+    def test_blocked_attack_does_not_use_up_the_smash(self):
+        self.press_heat()
+        self.press_heat()
+        self.m.tick(guard=[0, 12])  # chip, but the smash stays armed
+        self.assertGreater(self.p(0)["smash_left"], 0)
+        self.assertTrue(self.g.Engine.heat_active(self.m.state, 0))
+
+    def test_smash_disabled_by_switch(self):
+        self.g.MECH.heat_smash.enabled = False
+        self.press_heat()
+        self.press_heat()
+        self.assertEqual(self.p(0)["smash_left"], 0)
+        self.assertEqual(self.hit(1, 100), {})
+
+    def test_smash_can_ko(self):
+        self.m.tick(hp=[1000, 120])
+        self.press_heat()
+        self.press_heat()
+        self.assertEqual(self.hit(1, 50), {1: 0})
+
+    # Rage Art
+    def test_rage_art_needs_rage(self):
+        self.press_art()
+        self.assertEqual(self.p(0)["art_left"], 0)
+
+    def test_rage_art_lands_for_bonus_clears_pool_and_spends_rage(self):
+        self.m.tick(hp=[200, 1000])  # P1 in Rage
+        self.p(1)["pool"] = 30  # P2 has recoverable health
+        self.press_art()
+        self.assertGreater(self.p(0)["art_left"], 0)
+        writes = self.hit(1, 100)  # 100 + Rage 10 = 110, then Art 18% of 1000 = 180
+        self.assertEqual(writes, {1: 1000 - 110 - 180})
+        self.assertEqual(self.p(1)["pool"], 0)
+        self.assertEqual(self.m.state["art_count"], 1)
+        self.m.tick()
+        self.assertFalse(self.p(0)["rage"])  # Rage is spent
+
+    def test_rage_art_once_per_round(self):
+        self.m.tick(hp=[200, 1000])
+        self.press_art()
+        self.hit(1, 100)
+        self.m.tick(hp=[150, 1000])  # still low, but Rage is spent
+        self.press_art()
+        self.assertEqual(self.p(0)["art_left"], 0)
+
+    def test_rage_art_is_available_again_next_round(self):
+        self.m.hp_max = [1000, 1000]
+        self.m.tick(hp=[200, 1000])
+        self.press_art()
+        self.hit(1, 100)
+        self.m.tick(round=2, hp=[200, 1000])
+        self.m.tick(hp=[200, 1000])
+        self.press_art()
+        self.assertGreater(self.p(0)["art_left"], 0)
+
+    def test_missed_rage_art_spends_rage(self):
+        self.m.tick(hp=[200, 1000])
+        self.press_art()
+        for _ in range(125):
+            self.m.tick()
+        self.assertFalse(self.p(0)["rage"])
+        self.assertIn("Rage Art MISSED", str(self.m.state["last_event"]))
+
+    def test_rage_art_wins_back_some_of_your_recoverable_health(self):
+        self.m.tick(hp=[200, 1000])
+        self.p(0)["pool"] = 100
+        self.press_art()
+        writes = self.hit(1, 100)
+        # Rage Art wins back 7% of max (70) and landing any attack wins back 1% more (10)
+        self.assertEqual(writes[0], 200 + 70 + 10)
+        self.assertEqual(self.p(0)["pool"], 20)
+
+    def test_rage_art_disabled_by_switch(self):
+        self.g.MECH.rage_art.enabled = False
+        self.m.tick(hp=[200, 1000])
+        self.press_art()
+        self.assertEqual(self.p(0)["art_left"], 0)
+
+    # Heat start heals
+    def test_starting_heat_wins_back_half_the_recoverable_pool(self):
+        self.m.tick(hp=[600, 1000])
+        self.p(0)["pool"] = 100
+        writes = self.m.tick(keys=[True, False])
+        self.assertEqual(writes, {0: 650})
+        self.assertEqual(self.p(0)["pool"], 50)
+
+    def test_starting_heat_with_no_pool_writes_nothing(self):
+        self.assertEqual(self.m.tick(keys=[True, False]), {})
 
 
 class RoundAndDebug(unittest.TestCase):
@@ -598,6 +739,27 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
         joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
         self.assertNotIn("Last error", joined)
+
+    def test_art_key_is_read_from_the_keyboard_and_hud_shows_it_armed(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("players[0].vital_new = 100; players[0].vital_max = 1000")
+        self.frame(lua)
+        lua.execute("battle.Game.stage_timer = 1")
+        self.frame(lua)  # P1 in Rage
+        lua.execute("fake.keys[114] = true; battle.Game.stage_timer = 2")
+        self.frame(lua)
+        lua.execute("fake.keys[114] = false; fake.texts = {}; battle.Game.stage_timer = 3")
+        self.frame(lua)
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertIn("Last Heat event: P1 Rage Art armed", joined)
+
+    def test_missing_art_row_does_not_break_the_mod(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.rage_art = nil")  # as if the row were not built
+        self.frame(lua)
+        lua.execute("battle.Game.stage_timer = 1")
+        self.frame(lua)
 
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")

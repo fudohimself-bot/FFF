@@ -15,11 +15,13 @@ NA = "n/a"
 KIND_REQUIRES = {
     "rage": ["hp_threshold_pct", "damage_mult", "chip_taken_reduction_pct"],
     "heat": ["damage_mult", "duration_ticks", "uses_per_round", "pause_while_opponent_in_hitstun", "chip_pct_of_max",
-             "chip_can_ko", "recover_pct_of_max_per_landed_attack", "hit_trims_recoverable_pct", "key_p1", "key_p2"],
+             "chip_can_ko", "recover_pct_of_max_per_landed_attack", "hit_trims_recoverable_pct", "heat_start_heals_pct_of_pool", "key_p1", "key_p2"],
+    "heat_smash": ["armed_ticks", "bonus_pct_of_max"],
+    "rage_art": ["armed_ticks", "bonus_pct_of_max", "uses_per_round", "key_p1", "key_p2"],
     "juggle_scaling": [],
 }
 # Hooks a kind writes to: the hook row must allow writing.
-KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "juggle_scaling": []}
+KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "heat_smash": ["hp_now"], "rage_art": ["hp_now"], "juggle_scaling": []}
 STATUS_BUILT = "implemented"
 
 

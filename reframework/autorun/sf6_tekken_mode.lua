@@ -20,6 +20,9 @@ local ROWS = {
       ["recover_pct_of_max_per_landed_attack"] = "n/a",
       ["chip_taken_reduction_pct"] = 70,
       ["hit_trims_recoverable_pct"] = "n/a",
+      ["heat_start_heals_pct_of_pool"] = "n/a",
+      ["armed_ticks"] = "n/a",
+      ["bonus_pct_of_max"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -48,6 +51,9 @@ local ROWS = {
       ["recover_pct_of_max_per_landed_attack"] = 1.0,
       ["chip_taken_reduction_pct"] = "n/a",
       ["hit_trims_recoverable_pct"] = 30,
+      ["heat_start_heals_pct_of_pool"] = 50,
+      ["armed_ticks"] = "n/a",
+      ["bonus_pct_of_max"] = "n/a",
       ["key_p1"] = 112,
       ["key_p2"] = 113,
       ["uses_hooks"] = {
@@ -63,6 +69,70 @@ local ROWS = {
       ["status"] = "implemented",
       ["verified"] = false,
       ["note"] = "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) to start Heat. It can be used once per round and lasts 10 seconds of running time (600 match ticks, about 60 per second); the timer stops while the opponent is in hitstun. Heat gives no damage bonus. A blocked hit costs the blocker chip damage that cannot KO; it is recoverable and is won back when the chipped fighter lands attacks. Not possible here: Heat Smash, Heat Dash, Heat Burst (2+3) input and Engager moves. Earlier version (+15% damage, 20 second cooldown, permanent chip) was verified in game; this version is a redesign and is untested."
+    },
+    {
+      ["id"] = "heat_smash",
+      ["enabled"] = true,
+      ["kind"] = "heat_smash",
+      ["trigger"] = "heat_key_while_in_heat",
+      ["hp_threshold_pct"] = "n/a",
+      ["damage_mult"] = "n/a",
+      ["duration_ticks"] = "n/a",
+      ["cooldown_ticks"] = "n/a",
+      ["chip_pct_of_max"] = "n/a",
+      ["uses_per_round"] = "n/a",
+      ["pause_while_opponent_in_hitstun"] = "n/a",
+      ["chip_can_ko"] = "n/a",
+      ["recover_pct_of_max_per_landed_attack"] = "n/a",
+      ["chip_taken_reduction_pct"] = "n/a",
+      ["hit_trims_recoverable_pct"] = "n/a",
+      ["heat_start_heals_pct_of_pool"] = "n/a",
+      ["armed_ticks"] = 120,
+      ["bonus_pct_of_max"] = 15,
+      ["key_p1"] = "n/a",
+      ["key_p2"] = "n/a",
+      ["uses_hooks"] = {
+        "round_no",
+        "stage_timer",
+        "hp_now",
+        "hp_max",
+        "key_state"
+      },
+      ["status"] = "implemented",
+      ["verified"] = false,
+      ["note"] = "Heat Smash stand-in: press the Heat key again while Heat is running to arm it for 2 seconds. The next hit that lands deals extra damage (15% of max health) and uses up your remaining Heat. If it does not land in time, the Heat is spent anyway. A blocked attack does not use it up. Not the real move: no animation, no armor."
+    },
+    {
+      ["id"] = "rage_art",
+      ["enabled"] = true,
+      ["kind"] = "rage_art",
+      ["trigger"] = "key_while_in_rage",
+      ["hp_threshold_pct"] = "n/a",
+      ["damage_mult"] = "n/a",
+      ["duration_ticks"] = "n/a",
+      ["cooldown_ticks"] = "n/a",
+      ["chip_pct_of_max"] = "n/a",
+      ["uses_per_round"] = 1,
+      ["pause_while_opponent_in_hitstun"] = "n/a",
+      ["chip_can_ko"] = "n/a",
+      ["recover_pct_of_max_per_landed_attack"] = "n/a",
+      ["chip_taken_reduction_pct"] = "n/a",
+      ["hit_trims_recoverable_pct"] = "n/a",
+      ["heat_start_heals_pct_of_pool"] = "n/a",
+      ["armed_ticks"] = 120,
+      ["bonus_pct_of_max"] = 18,
+      ["key_p1"] = 114,
+      ["key_p2"] = 115,
+      ["uses_hooks"] = {
+        "round_no",
+        "stage_timer",
+        "hp_now",
+        "hp_max",
+        "key_state"
+      },
+      ["status"] = "implemented",
+      ["verified"] = false,
+      ["note"] = "Rage Art stand-in: while in Rage, press the key (P1 F3 = 114, P2 F4 = 115) to arm it for 2 seconds, once per round. The next hit that lands deals extra damage (18% of max health), removes the opponent's recoverable health, wins back some of yours, and ends your Rage. If it does not land in time, Rage still ends. Not the real move: no animation or cinematic."
     }
   },
   ["hooks"] = {
@@ -222,17 +292,18 @@ for _, r in ipairs(ROWS.mechanics) do MECH[r.id] = r end
 -- ---------------------------------------------------------------------------
 -- Rules. Pure logic: takes a snapshot of the match, returns the health writes
 -- to make. No game calls in here, so it can be tested without the game.
---   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, hp_max = {[0]=n,[1]=n} (optional), guard = {[0]=n,[1]=n}, hitstun = {[0]=n,[1]=n} (optional), keys = {[0]=bool,[1]=bool} }
+--   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, hp_max = {[0]=n,[1]=n} (optional), guard = {[0]=n,[1]=n}, hitstun = {[0]=n,[1]=n} (optional), keys = {[0]=bool,[1]=bool}, art_keys = {[0]=bool,[1]=bool} (optional) }
 -- ---------------------------------------------------------------------------
 local Engine = {}
 
 local function new_player()
     return { max_hp = 0, last_hp = nil, last_guard = 0, rage = false, key_prev = false,
-             heat_left = 0, heat_used = false, heat_paused = 0, heat_ran = 0, pool = 0 }
+             heat_left = 0, heat_used = false, heat_paused = 0, heat_ran = 0, pool = 0,
+             smash_left = 0, art_left = 0, art_used = false, rage_spent = false, key_prev_art = false }
 end
 
 function Engine.new_state()
-    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
+    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, smash_count = 0, art_count = 0, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
 end
 
 local function enabled(id)
@@ -254,6 +325,18 @@ function Engine.start_heat(st, i)
     p.heat_used = true
     p.heat_paused = 0
     p.heat_ran = 0
+end
+
+-- Debug: arm the stand-in moves without the keys (ignores the usual conditions).
+function Engine.arm_smash(st, i)
+    if MECH.heat_smash then st.p[i].smash_left = MECH.heat_smash.armed_ticks end
+end
+
+function Engine.arm_art(st, i)
+    if MECH.rage_art then
+        st.p[i].art_left = MECH.rage_art.armed_ticks
+        st.p[i].art_used = true
+    end
 end
 
 function Engine.heat_active(st, i)
@@ -313,6 +396,29 @@ function Engine.step(st, snap)
         end
     end
 
+    -- Armed stand-in moves run out if nothing lands in time, and still cost you the Heat / Rage.
+    for i = 0, 1 do
+        local p = st.p[i]
+        if p.smash_left > 0 then
+            if not Engine.heat_active(st, i) then
+                p.smash_left = 0
+            else
+                p.smash_left = p.smash_left - 1
+                if p.smash_left == 0 then
+                    p.heat_left = 0
+                    st.last_event = string.format("P%d Heat Smash MISSED: Heat spent", i + 1)
+                end
+            end
+        end
+        if p.art_left > 0 then
+            p.art_left = p.art_left - 1
+            if p.art_left == 0 then
+                p.rage_spent = true
+                st.last_event = string.format("P%d Rage Art MISSED: Rage spent", i + 1)
+            end
+        end
+    end
+
     local hp = { [0] = snap.hp[0], [1] = snap.hp[1] }
     for i = 0, 1 do
         local real_max = snap.hp_max ~= nil and snap.hp_max[i] or nil
@@ -323,15 +429,47 @@ function Engine.step(st, snap)
         end
     end
 
-    -- Heat: a key press starts it, once per round (a new round, or a timer reset, gives it back).
+    -- Heat: a key press starts it, once per round (a new round, or a timer reset, gives it back). Starting Heat wins back
+    -- part of your recoverable health. Pressing the key again while in Heat arms the Heat Smash stand-in.
     if enabled("heat") then
         for i = 0, 1 do
             local p = st.p[i]
             local down = snap.keys[i] == true
-            if down and not p.key_prev and not p.heat_used and not Engine.heat_active(st, i) then
-                Engine.start_heat(st, i)
+            if down and not p.key_prev then
+                if Engine.heat_active(st, i) then
+                    if enabled("heat_smash") and p.smash_left == 0 then
+                        p.smash_left = MECH.heat_smash.armed_ticks
+                        st.last_event = string.format("P%d Heat Smash armed", i + 1)
+                    end
+                elseif not p.heat_used then
+                    Engine.start_heat(st, i)
+                    local heal = round_half_up(p.pool * MECH.heat.heat_start_heals_pct_of_pool / 100.0)
+                    if heal > 0 and hp[i] > 0 then
+                        local new_hp = math.min(p.max_hp, hp[i] + heal)
+                        local gained = new_hp - hp[i]
+                        if gained > 0 then
+                            p.pool = p.pool - gained
+                            hp[i] = new_hp
+                            writes[i] = new_hp
+                        end
+                    end
+                end
             end
             p.key_prev = down
+        end
+    end
+
+    -- Rage Art stand-in: only while in Rage, once per round.
+    if enabled("rage_art") and snap.art_keys ~= nil then
+        for i = 0, 1 do
+            local p = st.p[i]
+            local down = snap.art_keys[i] == true
+            if down and not p.key_prev_art and p.rage and not p.art_used and p.art_left == 0 then
+                p.art_left = MECH.rage_art.armed_ticks
+                p.art_used = true
+                st.last_event = string.format("P%d Rage Art armed", i + 1)
+            end
+            p.key_prev_art = down
         end
     end
 
@@ -360,6 +498,32 @@ function Engine.step(st, snap)
                 local total = last - hp[v]
                 local trim = round_half_up(total * MECH.heat.hit_trims_recoverable_pct / 100.0)
                 st.p[v].pool = math.max(0, st.p[v].pool - trim)
+            end
+            -- The armed stand-in moves land on this hit.
+            if enabled("heat_smash") and st.p[a].smash_left > 0 and hp[v] > 0 then
+                local extra = round_half_up(st.p[v].max_hp * MECH.heat_smash.bonus_pct_of_max / 100.0)
+                hp[v] = math.max(0, hp[v] - extra)
+                writes[v] = hp[v]
+                st.p[a].smash_left = 0
+                st.p[a].heat_left = 0
+                st.smash_count = st.smash_count + 1
+                st.last_event = string.format("P%d Heat Smash LANDED for %d extra, Heat spent", a + 1, extra)
+            end
+            if enabled("rage_art") and st.p[a].art_left > 0 and hp[v] > 0 then
+                local extra = round_half_up(st.p[v].max_hp * MECH.rage_art.bonus_pct_of_max / 100.0)
+                hp[v] = math.max(0, hp[v] - extra)
+                writes[v] = hp[v]
+                st.p[v].pool = 0
+                local gain = math.min(st.p[a].pool, round_half_up(st.p[a].max_hp * 0.07))
+                if gain > 0 and hp[a] > 0 then
+                    hp[a] = math.min(st.p[a].max_hp, hp[a] + gain)
+                    st.p[a].pool = st.p[a].pool - gain
+                    writes[a] = hp[a]
+                end
+                st.p[a].art_left = 0
+                st.p[a].rage_spent = true
+                st.art_count = st.art_count + 1
+                st.last_event = string.format("P%d Rage Art LANDED for %d extra, Rage spent", a + 1, extra)
             end
         end
     end
@@ -412,7 +576,7 @@ function Engine.step(st, snap)
     for i = 0, 1 do
         local p = st.p[i]
         if enabled("rage") and p.max_hp > 0 and hp[i] > 0 then
-            p.rage = hp[i] <= p.max_hp * MECH.rage.hp_threshold_pct / 100.0
+            p.rage = hp[i] <= p.max_hp * MECH.rage.hp_threshold_pct / 100.0 and not p.rage_spent
         else
             p.rage = false
         end
@@ -462,6 +626,11 @@ if re ~= nil and sdk ~= nil then
         end
         snap.keys[0] = reframework:is_key_down(MECH.heat.key_p1) == true
         snap.keys[1] = reframework:is_key_down(MECH.heat.key_p2) == true
+        if MECH.rage_art ~= nil then
+            snap.art_keys = {}
+            snap.art_keys[0] = reframework:is_key_down(MECH.rage_art.key_p1) == true
+            snap.art_keys[1] = reframework:is_key_down(MECH.rage_art.key_p2) == true
+        end
         return snap, players
     end
 
@@ -487,6 +656,8 @@ if re ~= nil and sdk ~= nil then
             else
                 imgui.text(label .. " Heat ready")
             end
+            if p.smash_left > 0 then imgui.text(label .. " HEAT SMASH ARMED") end
+            if p.art_left > 0 then imgui.text(label .. " RAGE ART ARMED") end
             if p.rage then imgui.text(label .. " RAGE") end
             if p.pool > 0 then imgui.text(string.format("%s recoverable %d", label, p.pool)) end
         end
@@ -539,10 +710,13 @@ if re ~= nil and sdk ~= nil then
             imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
             imgui.text(string.format("Chip hits: %d   block timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 state.chip_count, stats.guard_now[0], stats.guard_now[1], stats.guard_max[0], stats.guard_max[1]))
-            for _, id in ipairs({ "rage", "heat" }) do
-                local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
-                if changed then MECH[id].enabled = value end
+            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art" }) do
+                if MECH[id] ~= nil then
+                    local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
+                    if changed then MECH[id].enabled = value end
+                end
             end
+            imgui.text(string.format("Heat Smashes landed: %d   Rage Arts landed: %d", state.smash_count, state.art_count))
             imgui.text(string.format("Hitstun timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 stats.hit_now[0], stats.hit_now[1], stats.hit_max[0], stats.hit_max[1]))
             imgui.text(string.format("Held buttons (game bits) P1 %d [%s]  P2 %d [%s]",
@@ -555,6 +729,8 @@ if re ~= nil and sdk ~= nil then
             local fchanged, fvalue = imgui.checkbox("force P1 Rage on", Engine.debug.force_rage[0])
             if fchanged then Engine.debug.force_rage[0] = fvalue end
             if imgui.button("start P1 Heat now (no key)") then Engine.start_heat(state, 0) end
+            if imgui.button("arm P1 Heat Smash (needs Heat on)") then Engine.arm_smash(state, 0) end
+            if imgui.button("arm P1 Rage Art (no key)") then Engine.arm_art(state, 0) end
             for i = 0, 1 do
                 imgui.text(string.format("P%d  rage: %s  heat: %s (%d ticks left, available this round: %s)  recoverable: %d", i + 1,
                     tostring(state.p[i].rage), tostring(Engine.heat_active(state, i)),

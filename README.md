@@ -2,7 +2,7 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: first versions verified in game; the Tekken 8 versions are untested.** In real offline matches (2026-10-07) every field the mod needs read correctly, health writes were kept, and an earlier Rage (20%, +15%) and Heat (+15%, cooldown, permanent chip, F1 key) both worked. Since then both were redesigned to follow Tekken 8, and an on-screen readout and a button-bit readout were added; none of that has been played yet. The rules are tested against a fake match and a fake REFramework (66 tests).
+**Status: first versions verified in game; the Tekken 8 versions are untested.** In real offline matches (2026-10-07) every field the mod needs read correctly, health writes were kept, and an earlier Rage (20%, +15%) and Heat (+15%, cooldown, permanent chip, F1 key) both worked. Since then both were redesigned to follow Tekken 8, and an on-screen readout and a button-bit readout were added; none of that has been played yet. The rules are tested against a fake match and a fake REFramework (83 tests).
 
 ## What it adds
 
@@ -11,10 +11,13 @@ Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (l
 | Rage | Tekken 8 season 3: at or under 25% health, every hit deals 10% more damage (rounded down) and you take 70% less chip damage | built, untested in game |
 | Heat | P1 presses **F1** (P2 **F2**): once per round, 10 seconds of running time that stops while the opponent is in hitstun. No damage bonus. Blocked hits chip the blocker (2% of max health, an estimate) | built, untested in game |
 | Recoverable health | Heat chip can't KO and is won back (1% of max health per landed attack, an estimate) when the chipped fighter lands attacks. A hit on a fighter not in Heat eats 30% of its damage from their recoverable health | built, untested in game |
+| Heat start heal | Starting Heat wins back half of your recoverable health (an estimate), like Tekken's Engager | built, untested in game |
+| Heat Smash (stand-in) | Press the Heat key again while in Heat to arm it for 2 seconds. Your next hit deals 15% of max health extra and uses up your Heat. If it doesn't land in time, the Heat is spent anyway. A block doesn't use it up | built, untested in game. Not the real move: no animation or armor |
+| Rage Art (stand-in) | While in Rage, press **F3** (P2 **F4**), once per round. Your next hit within 2 seconds deals 18% of max health extra, removes the opponent's recoverable health, wins back some of yours and ends your Rage. If it misses, Rage still ends | built, untested in game. Not the real move: no cinematic |
 | On-screen readout | Heat bar, Rage and recoverable health for both fighters, from the mod itself | built, untested in game |
 | Juggle scaling | Longer air combos | research only, not built |
 
-**Not possible in this mod** (they need new moves, animations or movement, not state changes): Heat Smash, Heat Dash, Heat Burst as a 2+3 input, Heat Engager moves, Rage Art, sidesteps, Tekken's four-button layout and a Tekken move list for any SF6 fighter. **Possible but needs more research:** wall carry and bounce tuning, and starting Heat from a gamepad button combo (the panel shows the game's raw held-button bits so they can be decoded).
+**Not possible in this mod** (they need new moves, animations or movement, not state changes): the real Heat Smash and Rage Art moves, Heat Dash, Heat Burst as a 2+3 input, Heat Engager moves, sidesteps, Tekken's four-button layout and a Tekken move list for any SF6 fighter. **Possible but needs more research:** wall carry and bounce tuning, and starting Heat from a gamepad button combo (the panel shows the game's raw held-button bits so they can be decoded).
 
 Both built systems add their bonus by lowering the victim's health after a hit. SF6 accepted these writes in real offline matches. What isn't known yet is how the game's rollback system behaves over a long session, and whether the on-screen health bar always follows the written value.
 

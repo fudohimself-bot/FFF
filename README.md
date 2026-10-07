@@ -1,6 +1,6 @@
 # Gojo in Elden Ring
 
-A personal, **offline-only** mod: Gojo Satoru's model from Jujutsu Kaisen Cursed Clash, worn by your Elden Ring character in place of one armor set, loaded with Mod Engine 2.
+A personal, **offline-only** mod: Gojo Satoru's model from Jujutsu Kaisen Cursed Clash, worn by your Elden Ring character in place of one armor set, plus his moves (combos, Blue, Red, Hollow Purple, Infinity, Domain Expansion) rebuilt as an Elden Ring fist weapon and sorceries. Loaded with Mod Engine 2.
 
 **Status: plan only. Nothing has been run on the real games yet.**
 

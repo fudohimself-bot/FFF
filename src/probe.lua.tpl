@@ -74,9 +74,90 @@ if re ~= nil and sdk ~= nil then
         report_text = string.format("%d hooks checked, %d failed. Saved: %s", #report.results, bad, tostring(saved))
     end
 
+    -- Write test: for every hook the sheet says is writable, take 1 off player 1's value, then read it back
+    -- right away and again 30 and 120 frames later. Shows whether the game keeps the write or puts the old value back.
+    local pending = nil
+
+    local function parent_and_key(steps, i)
+        local t = sdk.find_type_definition("gBattle")
+        if not t then return nil, "gBattle type not found" end
+        local obj = t:get_field(steps[1]):get_data(nil)
+        for s = 2, #steps - 1 do
+            local key = steps[s]
+            if key == "[i]" then key = i end
+            obj = obj[key]
+            if obj == nil then return nil, "nil at " .. tostring(key) end
+        end
+        return obj, steps[#steps]
+    end
+
+    local function start_write_test()
+        pending = { frame = 0, tests = {} }
+        for _, hook in ipairs(HOOKS) do
+            if hook.kind == "field" and string.find(hook.access, "w", 1, true) then
+                local t = { id = hook.id }
+                local ok, parent, key = pcall(parent_and_key, hook.path_steps, 0)
+                if ok and parent ~= nil then
+                    local before = tonumber(parent[key])
+                    t.before = before
+                    local okw, errw = pcall(function() parent[key] = before - 1 end)
+                    t.write_ok = okw
+                    if not okw then t.error = tostring(errw) end
+                    t.after_write = tonumber(parent[key])
+                    t.parent, t.key = parent, key
+                else
+                    t.write_ok = false
+                    t.error = tostring(ok and key or parent)
+                end
+                pending.tests[#pending.tests + 1] = t
+            end
+        end
+    end
+
+    local function finish_write_test()
+        local out = { frames_checked = { 1, 30, 120 }, results = {} }
+        for _, t in ipairs(pending.tests) do
+            out.results[#out.results + 1] = {
+                id = t.id, write_ok = t.write_ok, error = t.error, before = t.before,
+                after_write = t.after_write, after_1_frame = t.f1, after_30_frames = t.f30, after_120_frames = t.f120,
+            }
+        end
+        json.dump_file("sf6_tekken/write_test_report.json", out)
+        report_text = "write test saved: sf6_tekken/write_test_report.json"
+        pending = nil
+    end
+
+    re.on_frame(function()
+        if pending == nil then return end
+        pending.frame = pending.frame + 1
+        local f = pending.frame
+        local label = (f == 1 and "f1") or (f == 30 and "f30") or (f == 120 and "f120") or nil
+        if label then
+            for _, t in ipairs(pending.tests) do
+                if t.parent ~= nil then
+                    local ok, v = pcall(function() return tonumber(t.parent[t.key]) end)
+                    t[label] = ok and v or nil
+                end
+            end
+        end
+        if f >= 120 then
+            local ok, err = pcall(finish_write_test)
+            if not ok then report_text = "write test crashed: " .. tostring(err); pending = nil end
+        end
+    end)
+
     re.on_draw_ui(function()
         if imgui.tree_node("SF6 Tekken Probe") then
             imgui.text("Press during an offline match.")
+            if imgui.button("Run write test (takes 1 health point from P1)") then
+                local ok, err = pcall(start_write_test)
+                if ok then
+                    report_text = "write test running, wait 3 seconds..."
+                else
+                    report_text = "write test crashed: " .. tostring(err)
+                    pending = nil
+                end
+            end
             if imgui.button("Run probe now") then
                 local ok, err = pcall(run_probe)
                 if not ok then report_text = "probe crashed: " .. tostring(err) end

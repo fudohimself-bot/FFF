@@ -10,7 +10,7 @@ for _, r in ipairs(ROWS.mechanics) do MECH[r.id] = r end
 -- ---------------------------------------------------------------------------
 -- Rules. Pure logic: takes a snapshot of the match, returns the health writes
 -- to make. No game calls in here, so it can be tested without the game.
---   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, guard = {[0]=n,[1]=n}, keys = {[0]=bool,[1]=bool} }
+--   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, hp_max = {[0]=n,[1]=n} (optional), guard = {[0]=n,[1]=n}, keys = {[0]=bool,[1]=bool} }
 -- ---------------------------------------------------------------------------
 local Engine = {}
 
@@ -52,7 +52,12 @@ function Engine.step(st, snap)
 
     local hp = { [0] = snap.hp[0], [1] = snap.hp[1] }
     for i = 0, 1 do
-        if hp[i] > st.p[i].max_hp then st.p[i].max_hp = hp[i] end
+        local real_max = snap.hp_max ~= nil and snap.hp_max[i] or nil
+        if real_max ~= nil and real_max > 0 then
+            st.p[i].max_hp = real_max
+        elseif hp[i] > st.p[i].max_hp then
+            st.p[i].max_hp = hp[i]  -- fallback: highest health seen this round
+        end
     end
 
     -- Heat: key press starts a timed burst, then a cooldown.
@@ -130,6 +135,7 @@ if re ~= nil and sdk ~= nil then
     local state = Engine.new_state()
     local last_error = nil
     local last_status = "waiting for a match"
+    local stats = { writes = 0, last = "none yet" }
 
     local function num(v)
         local n = tonumber(v)
@@ -143,10 +149,12 @@ if re ~= nil and sdk ~= nil then
         local round = t:get_field("Round"):get_data(nil).RoundNo
         local timer = t:get_field("Game"):get_data(nil).stage_timer
         local players = t:get_field("Player"):get_data(nil).mcPlayer
-        local snap = { round = num(round), timer = num(timer), hp = {}, guard = {}, keys = {} }
+        local snap = { round = num(round), timer = num(timer), hp = {}, hp_max = {}, guard = {}, keys = {} }
         for i = 0, 1 do
             snap.hp[i] = num(players[i].vital_new)
             snap.guard[i] = num(players[i].guard_time)
+            local ok_max, mx = pcall(function() return players[i].vital_max end)
+            snap.hp_max[i] = ok_max and num(mx) or 0
         end
         snap.keys[0] = reframework:is_key_down(MECH.heat.key_p1) == true
         snap.keys[1] = reframework:is_key_down(MECH.heat.key_p2) == true
@@ -171,8 +179,14 @@ if re ~= nil and sdk ~= nil then
         end
         last_status = "running (round " .. tostring(snap.round) .. ")"
         for i, new_hp in pairs(writes) do
+            local before = snap.hp[i]
             local ok3, err = pcall(function() players[i].vital_new = new_hp end)
-            if not ok3 then last_error = "health write failed: " .. tostring(err) end
+            if ok3 then
+                stats.writes = stats.writes + 1
+                stats.last = string.format("P%d health %d -> %d", i + 1, before, new_hp)
+            else
+                last_error = "health write failed: " .. tostring(err)
+            end
         end
     end)
 
@@ -180,6 +194,7 @@ if re ~= nil and sdk ~= nil then
         if imgui.tree_node("SF6 Tekken Mode (offline only)") then
             imgui.text("Status: " .. last_status)
             if last_error then imgui.text("Last error: " .. last_error) end
+            imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
             for _, id in ipairs({ "rage", "heat" }) do
                 local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                 if changed then MECH[id].enabled = value end

@@ -83,8 +83,10 @@ def preflight(hooks, mechs):
     for hid, row in hook_ids.items():
         if hid not in used:
             errors.append(f"hooks.{hid}: no mechanics row uses it")
-        if row.get("verified") is not True:
-            unverified.append(f"hooks.{hid}")
+        if row.get("read_verified") is not True:
+            unverified.append(f"hooks.{hid} (read)")
+        if "w" in row.get("access", "") and row.get("write_verified") is not True:
+            unverified.append(f"hooks.{hid} (write)")
     return errors, unverified, unbuilt
 
 

@@ -15,7 +15,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Detect a new round so per-round state resets",
     ["source"] = "SF6_replay_capture: gBattle.Round.RoundNo",
-    ["verified"] = false
+    ["read_verified"] = true,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Probe 2026-10-07: read 0 in an offline match"
   },
   {
     ["id"] = "stage_timer",
@@ -28,7 +30,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Detect that the match simulation advanced one tick (render frames and sim ticks differ)",
     ["source"] = "SF6_replay_capture: gBattle.Game.stage_timer",
-    ["verified"] = false
+    ["read_verified"] = true,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Probe 2026-10-07: read 153"
   },
   {
     ["id"] = "hp_now",
@@ -43,7 +47,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Read health to find damage taken and Rage threshold; write it to add bonus damage and chip damage",
     ["source"] = "SF6_replay_capture: cPlayer[i].vital_new (read only there; writing is unproven)",
-    ["verified"] = false
+    ["read_verified"] = true,
+    ["write_verified"] = false,
+    ["evidence"] = "Probe 2026-10-07: both players read 10000. Write not tested yet."
   },
   {
     ["id"] = "guard_time",
@@ -58,7 +64,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Detect the moment a fighter starts blocking (blockstun begins) for Heat chip damage",
     ["source"] = "SF6_replay_capture: cPlayer[i].guard_time",
-    ["verified"] = false
+    ["read_verified"] = true,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Probe 2026-10-07: both players read 0 (not blocking). Value while blocking not seen yet."
   },
   {
     ["id"] = "juggle_counter",
@@ -73,7 +81,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Research only: what SF6 tracks during air combos, to see whether juggle scaling can be changed",
     ["source"] = "SF6_replay_capture: cPlayer[i].combo_dm_air (meaning not confirmed)",
-    ["verified"] = false
+    ["read_verified"] = true,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Probe 2026-10-07: both players read -1 (no combo running). Meaning during a combo not seen yet."
   },
   {
     ["id"] = "key_state",
@@ -86,7 +96,26 @@ local HOOKS = {
     ["value_type"] = "bool",
     ["purpose"] = "Read the keyboard keys that trigger Heat (REFramework gives raw keys only, no gamepad)",
     ["source"] = "Melty game_info for SF6: reframework:is_key_down(vk)",
-    ["verified"] = false
+    ["read_verified"] = true,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Probe 2026-10-07: reframework.is_key_down exists"
+  },
+  {
+    ["id"] = "hp_max",
+    ["kind"] = "field",
+    ["path_steps"] = {
+      "Player",
+      "mcPlayer",
+      "[i]",
+      "vital_max"
+    },
+    ["access"] = "r",
+    ["value_type"] = "int",
+    ["purpose"] = "Real maximum health, for the Rage threshold and Heat chip size (replaces remembering the highest health seen)",
+    ["source"] = "Probe 2026-10-07 field list: vital_max exists on the fighter object",
+    ["read_verified"] = false,
+    ["write_verified"] = "n/a",
+    ["evidence"] = "Field name seen in the probe's field list; its value has not been read yet."
   }
 }
 
@@ -159,9 +188,90 @@ if re ~= nil and sdk ~= nil then
         report_text = string.format("%d hooks checked, %d failed. Saved: %s", #report.results, bad, tostring(saved))
     end
 
+    -- Write test: for every hook the sheet says is writable, take 1 off player 1's value, then read it back
+    -- right away and again 30 and 120 frames later. Shows whether the game keeps the write or puts the old value back.
+    local pending = nil
+
+    local function parent_and_key(steps, i)
+        local t = sdk.find_type_definition("gBattle")
+        if not t then return nil, "gBattle type not found" end
+        local obj = t:get_field(steps[1]):get_data(nil)
+        for s = 2, #steps - 1 do
+            local key = steps[s]
+            if key == "[i]" then key = i end
+            obj = obj[key]
+            if obj == nil then return nil, "nil at " .. tostring(key) end
+        end
+        return obj, steps[#steps]
+    end
+
+    local function start_write_test()
+        pending = { frame = 0, tests = {} }
+        for _, hook in ipairs(HOOKS) do
+            if hook.kind == "field" and string.find(hook.access, "w", 1, true) then
+                local t = { id = hook.id }
+                local ok, parent, key = pcall(parent_and_key, hook.path_steps, 0)
+                if ok and parent ~= nil then
+                    local before = tonumber(parent[key])
+                    t.before = before
+                    local okw, errw = pcall(function() parent[key] = before - 1 end)
+                    t.write_ok = okw
+                    if not okw then t.error = tostring(errw) end
+                    t.after_write = tonumber(parent[key])
+                    t.parent, t.key = parent, key
+                else
+                    t.write_ok = false
+                    t.error = tostring(ok and key or parent)
+                end
+                pending.tests[#pending.tests + 1] = t
+            end
+        end
+    end
+
+    local function finish_write_test()
+        local out = { frames_checked = { 1, 30, 120 }, results = {} }
+        for _, t in ipairs(pending.tests) do
+            out.results[#out.results + 1] = {
+                id = t.id, write_ok = t.write_ok, error = t.error, before = t.before,
+                after_write = t.after_write, after_1_frame = t.f1, after_30_frames = t.f30, after_120_frames = t.f120,
+            }
+        end
+        json.dump_file("sf6_tekken/write_test_report.json", out)
+        report_text = "write test saved: sf6_tekken/write_test_report.json"
+        pending = nil
+    end
+
+    re.on_frame(function()
+        if pending == nil then return end
+        pending.frame = pending.frame + 1
+        local f = pending.frame
+        local label = (f == 1 and "f1") or (f == 30 and "f30") or (f == 120 and "f120") or nil
+        if label then
+            for _, t in ipairs(pending.tests) do
+                if t.parent ~= nil then
+                    local ok, v = pcall(function() return tonumber(t.parent[t.key]) end)
+                    t[label] = ok and v or nil
+                end
+            end
+        end
+        if f >= 120 then
+            local ok, err = pcall(finish_write_test)
+            if not ok then report_text = "write test crashed: " .. tostring(err); pending = nil end
+        end
+    end)
+
     re.on_draw_ui(function()
         if imgui.tree_node("SF6 Tekken Probe") then
             imgui.text("Press during an offline match.")
+            if imgui.button("Run write test (takes 1 health point from P1)") then
+                local ok, err = pcall(start_write_test)
+                if ok then
+                    report_text = "write test running, wait 3 seconds..."
+                else
+                    report_text = "write test crashed: " .. tostring(err)
+                    pending = nil
+                end
+            end
             if imgui.button("Run probe now") then
                 local ok, err = pcall(run_probe)
                 if not ok then report_text = "probe crashed: " .. tostring(err) end

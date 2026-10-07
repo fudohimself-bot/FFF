@@ -1,19 +1,131 @@
 {
   "sheet": "hooks",
-  "about": "Every place the mod touches the game. Each row is one read or write. Field names come from a third-party SF6 Lua script (rkaganda/SF6_replay_capture); none of them are proven until the probe runs in the real game.",
-  "columns": ["id", "kind", "path_steps", "access", "value_type", "purpose", "source", "verified"],
+  "about": "Every place the mod touches the game. Each row is one read or write. read_verified / write_verified become true only when the probe or a test in the real game shows it. Field names first came from a third-party script (rkaganda/SF6_replay_capture).",
+  "columns": [
+    "id",
+    "kind",
+    "path_steps",
+    "access",
+    "value_type",
+    "purpose",
+    "source",
+    "read_verified",
+    "write_verified",
+    "evidence"
+  ],
   "rows": [
-    {"id": "round_no", "kind": "field", "path_steps": ["Round", "RoundNo"], "access": "r", "value_type": "int",
-     "purpose": "Detect a new round so per-round state resets", "source": "SF6_replay_capture: gBattle.Round.RoundNo", "verified": false},
-    {"id": "stage_timer", "kind": "field", "path_steps": ["Game", "stage_timer"], "access": "r", "value_type": "int",
-     "purpose": "Detect that the match simulation advanced one tick (render frames and sim ticks differ)", "source": "SF6_replay_capture: gBattle.Game.stage_timer", "verified": false},
-    {"id": "hp_now", "kind": "field", "path_steps": ["Player", "mcPlayer", "[i]", "vital_new"], "access": "rw", "value_type": "int",
-     "purpose": "Read health to find damage taken and Rage threshold; write it to add bonus damage and chip damage", "source": "SF6_replay_capture: cPlayer[i].vital_new (read only there; writing is unproven)", "verified": false},
-    {"id": "guard_time", "kind": "field", "path_steps": ["Player", "mcPlayer", "[i]", "guard_time"], "access": "r", "value_type": "int",
-     "purpose": "Detect the moment a fighter starts blocking (blockstun begins) for Heat chip damage", "source": "SF6_replay_capture: cPlayer[i].guard_time", "verified": false},
-    {"id": "juggle_counter", "kind": "field", "path_steps": ["Player", "mcPlayer", "[i]", "combo_dm_air"], "access": "r", "value_type": "int",
-     "purpose": "Research only: what SF6 tracks during air combos, to see whether juggle scaling can be changed", "source": "SF6_replay_capture: cPlayer[i].combo_dm_air (meaning not confirmed)", "verified": false},
-    {"id": "key_state", "kind": "api", "path_steps": ["reframework", "is_key_down"], "access": "r", "value_type": "bool",
-     "purpose": "Read the keyboard keys that trigger Heat (REFramework gives raw keys only, no gamepad)", "source": "Melty game_info for SF6: reframework:is_key_down(vk)", "verified": false}
+    {
+      "id": "round_no",
+      "kind": "field",
+      "path_steps": [
+        "Round",
+        "RoundNo"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Detect a new round so per-round state resets",
+      "source": "SF6_replay_capture: gBattle.Round.RoundNo",
+      "read_verified": true,
+      "write_verified": "n/a",
+      "evidence": "Probe 2026-10-07: read 0 in an offline match"
+    },
+    {
+      "id": "stage_timer",
+      "kind": "field",
+      "path_steps": [
+        "Game",
+        "stage_timer"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Detect that the match simulation advanced one tick (render frames and sim ticks differ)",
+      "source": "SF6_replay_capture: gBattle.Game.stage_timer",
+      "read_verified": true,
+      "write_verified": "n/a",
+      "evidence": "Probe 2026-10-07: read 153"
+    },
+    {
+      "id": "hp_now",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "vital_new"
+      ],
+      "access": "rw",
+      "value_type": "int",
+      "purpose": "Read health to find damage taken and Rage threshold; write it to add bonus damage and chip damage",
+      "source": "SF6_replay_capture: cPlayer[i].vital_new (read only there; writing is unproven)",
+      "read_verified": true,
+      "write_verified": false,
+      "evidence": "Probe 2026-10-07: both players read 10000. Write not tested yet."
+    },
+    {
+      "id": "guard_time",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "guard_time"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Detect the moment a fighter starts blocking (blockstun begins) for Heat chip damage",
+      "source": "SF6_replay_capture: cPlayer[i].guard_time",
+      "read_verified": true,
+      "write_verified": "n/a",
+      "evidence": "Probe 2026-10-07: both players read 0 (not blocking). Value while blocking not seen yet."
+    },
+    {
+      "id": "juggle_counter",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "combo_dm_air"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Research only: what SF6 tracks during air combos, to see whether juggle scaling can be changed",
+      "source": "SF6_replay_capture: cPlayer[i].combo_dm_air (meaning not confirmed)",
+      "read_verified": true,
+      "write_verified": "n/a",
+      "evidence": "Probe 2026-10-07: both players read -1 (no combo running). Meaning during a combo not seen yet."
+    },
+    {
+      "id": "key_state",
+      "kind": "api",
+      "path_steps": [
+        "reframework",
+        "is_key_down"
+      ],
+      "access": "r",
+      "value_type": "bool",
+      "purpose": "Read the keyboard keys that trigger Heat (REFramework gives raw keys only, no gamepad)",
+      "source": "Melty game_info for SF6: reframework:is_key_down(vk)",
+      "read_verified": true,
+      "write_verified": "n/a",
+      "evidence": "Probe 2026-10-07: reframework.is_key_down exists"
+    },
+    {
+      "id": "hp_max",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "vital_max"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Real maximum health, for the Rage threshold and Heat chip size (replaces remembering the highest health seen)",
+      "source": "Probe 2026-10-07 field list: vital_max exists on the fighter object",
+      "read_verified": false,
+      "write_verified": "n/a",
+      "evidence": "Field name seen in the probe's field list; its value has not been read yet."
+    }
   ]
 }

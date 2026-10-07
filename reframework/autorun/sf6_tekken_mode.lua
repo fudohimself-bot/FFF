@@ -19,7 +19,8 @@ local ROWS = {
       ["uses_hooks"] = {
         "round_no",
         "stage_timer",
-        "hp_now"
+        "hp_now",
+        "hp_max"
       },
       ["status"] = "implemented",
       ["verified"] = false,
@@ -41,6 +42,7 @@ local ROWS = {
         "round_no",
         "stage_timer",
         "hp_now",
+        "hp_max",
         "guard_time",
         "key_state"
       },
@@ -61,7 +63,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Detect a new round so per-round state resets",
       ["source"] = "SF6_replay_capture: gBattle.Round.RoundNo",
-      ["verified"] = false
+      ["read_verified"] = true,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Probe 2026-10-07: read 0 in an offline match"
     },
     {
       ["id"] = "stage_timer",
@@ -74,7 +78,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Detect that the match simulation advanced one tick (render frames and sim ticks differ)",
       ["source"] = "SF6_replay_capture: gBattle.Game.stage_timer",
-      ["verified"] = false
+      ["read_verified"] = true,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Probe 2026-10-07: read 153"
     },
     {
       ["id"] = "hp_now",
@@ -89,7 +95,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Read health to find damage taken and Rage threshold; write it to add bonus damage and chip damage",
       ["source"] = "SF6_replay_capture: cPlayer[i].vital_new (read only there; writing is unproven)",
-      ["verified"] = false
+      ["read_verified"] = true,
+      ["write_verified"] = false,
+      ["evidence"] = "Probe 2026-10-07: both players read 10000. Write not tested yet."
     },
     {
       ["id"] = "guard_time",
@@ -104,7 +112,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Detect the moment a fighter starts blocking (blockstun begins) for Heat chip damage",
       ["source"] = "SF6_replay_capture: cPlayer[i].guard_time",
-      ["verified"] = false
+      ["read_verified"] = true,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Probe 2026-10-07: both players read 0 (not blocking). Value while blocking not seen yet."
     },
     {
       ["id"] = "juggle_counter",
@@ -119,7 +129,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Research only: what SF6 tracks during air combos, to see whether juggle scaling can be changed",
       ["source"] = "SF6_replay_capture: cPlayer[i].combo_dm_air (meaning not confirmed)",
-      ["verified"] = false
+      ["read_verified"] = true,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Probe 2026-10-07: both players read -1 (no combo running). Meaning during a combo not seen yet."
     },
     {
       ["id"] = "key_state",
@@ -132,7 +144,26 @@ local ROWS = {
       ["value_type"] = "bool",
       ["purpose"] = "Read the keyboard keys that trigger Heat (REFramework gives raw keys only, no gamepad)",
       ["source"] = "Melty game_info for SF6: reframework:is_key_down(vk)",
-      ["verified"] = false
+      ["read_verified"] = true,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Probe 2026-10-07: reframework.is_key_down exists"
+    },
+    {
+      ["id"] = "hp_max",
+      ["kind"] = "field",
+      ["path_steps"] = {
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "vital_max"
+      },
+      ["access"] = "r",
+      ["value_type"] = "int",
+      ["purpose"] = "Real maximum health, for the Rage threshold and Heat chip size (replaces remembering the highest health seen)",
+      ["source"] = "Probe 2026-10-07 field list: vital_max exists on the fighter object",
+      ["read_verified"] = false,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Field name seen in the probe's field list; its value has not been read yet."
     }
   }
 }
@@ -143,7 +174,7 @@ for _, r in ipairs(ROWS.mechanics) do MECH[r.id] = r end
 -- ---------------------------------------------------------------------------
 -- Rules. Pure logic: takes a snapshot of the match, returns the health writes
 -- to make. No game calls in here, so it can be tested without the game.
---   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, guard = {[0]=n,[1]=n}, keys = {[0]=bool,[1]=bool} }
+--   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, hp_max = {[0]=n,[1]=n} (optional), guard = {[0]=n,[1]=n}, keys = {[0]=bool,[1]=bool} }
 -- ---------------------------------------------------------------------------
 local Engine = {}
 
@@ -185,7 +216,12 @@ function Engine.step(st, snap)
 
     local hp = { [0] = snap.hp[0], [1] = snap.hp[1] }
     for i = 0, 1 do
-        if hp[i] > st.p[i].max_hp then st.p[i].max_hp = hp[i] end
+        local real_max = snap.hp_max ~= nil and snap.hp_max[i] or nil
+        if real_max ~= nil and real_max > 0 then
+            st.p[i].max_hp = real_max
+        elseif hp[i] > st.p[i].max_hp then
+            st.p[i].max_hp = hp[i]  -- fallback: highest health seen this round
+        end
     end
 
     -- Heat: key press starts a timed burst, then a cooldown.
@@ -263,6 +299,7 @@ if re ~= nil and sdk ~= nil then
     local state = Engine.new_state()
     local last_error = nil
     local last_status = "waiting for a match"
+    local stats = { writes = 0, last = "none yet" }
 
     local function num(v)
         local n = tonumber(v)
@@ -276,10 +313,12 @@ if re ~= nil and sdk ~= nil then
         local round = t:get_field("Round"):get_data(nil).RoundNo
         local timer = t:get_field("Game"):get_data(nil).stage_timer
         local players = t:get_field("Player"):get_data(nil).mcPlayer
-        local snap = { round = num(round), timer = num(timer), hp = {}, guard = {}, keys = {} }
+        local snap = { round = num(round), timer = num(timer), hp = {}, hp_max = {}, guard = {}, keys = {} }
         for i = 0, 1 do
             snap.hp[i] = num(players[i].vital_new)
             snap.guard[i] = num(players[i].guard_time)
+            local ok_max, mx = pcall(function() return players[i].vital_max end)
+            snap.hp_max[i] = ok_max and num(mx) or 0
         end
         snap.keys[0] = reframework:is_key_down(MECH.heat.key_p1) == true
         snap.keys[1] = reframework:is_key_down(MECH.heat.key_p2) == true
@@ -304,8 +343,14 @@ if re ~= nil and sdk ~= nil then
         end
         last_status = "running (round " .. tostring(snap.round) .. ")"
         for i, new_hp in pairs(writes) do
+            local before = snap.hp[i]
             local ok3, err = pcall(function() players[i].vital_new = new_hp end)
-            if not ok3 then last_error = "health write failed: " .. tostring(err) end
+            if ok3 then
+                stats.writes = stats.writes + 1
+                stats.last = string.format("P%d health %d -> %d", i + 1, before, new_hp)
+            else
+                last_error = "health write failed: " .. tostring(err)
+            end
         end
     end)
 
@@ -313,6 +358,7 @@ if re ~= nil and sdk ~= nil then
         if imgui.tree_node("SF6 Tekken Mode (offline only)") then
             imgui.text("Status: " .. last_status)
             if last_error then imgui.text("Last error: " .. last_error) end
+            imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
             for _, id in ipairs({ "rage", "heat" }) do
                 local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                 if changed then MECH[id].enabled = value end

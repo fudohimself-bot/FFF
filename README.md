@@ -2,7 +2,7 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: NOT YET RUN IN THE REAL GAME.** The rules are tested against a fake match and a fake REFramework (32 tests), but every game field this mod touches is still unproven until the probe below has run on a real copy of SF6. Treat it as untested.
+**Status: partly verified.** The first probe in the real game (2026-10-07) read every field fine: health, max health is still to be read, block timer, match timer, round number and the keyboard check. **Writing health has not been tested yet**, and Rage and Heat depend on it, so treat the mod as untested until the write test below passes. The rules are tested against a fake match and a fake REFramework (41 tests).
 
 ## What it adds
 
@@ -28,8 +28,9 @@ SF6 has in-process anti-cheat for online play, and mods can get an account banne
 
 1. Start a local versus or training match.
 2. Press **Insert** to open the REFramework menu. Find **SF6 Tekken Probe** and press **Run probe now**.
-3. Send me `reframework/data/sf6_tekken/probe_report.json` (in the game folder). It says which of the field names worked. I then mark the hooks as verified or fix the ones that failed.
-4. Then try the mod itself: open **SF6 Tekken Mode (offline only)** in the same menu to see its status and switch Rage or Heat off.
+3. Send me `reframework/data/sf6_tekken/probe_report.json` (in the game folder). It says which of the field names worked.
+4. Press **Run write test**. It takes 1 health point from P1 and checks, right away and again 1, 30 and 120 frames later, whether the game kept the change. Send me `write_test_report.json` from the same folder.
+5. Then try the mod itself: open **SF6 Tekken Mode (offline only)** in the same menu. It shows each player's Rage and Heat state, and how many bonus health writes it has made.
 
 ## How it's built
 

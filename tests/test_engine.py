@@ -34,6 +34,7 @@ class Match:
         self.state = self.engine.new_state()
         self.round, self.timer = 1, 0
         self.hp = [1000, 1000]
+        self.hp_max = None  # None = game gave no max health (engine falls back to highest seen)
         self.guard = [0, 0]
         self.keys = [False, False]
 
@@ -43,9 +44,13 @@ class Match:
             self.timer += 1
         for k, v in kw.items():
             setattr(self, k, v)
+        extra = {}
+        if self.hp_max is not None:
+            extra["hp_max"] = self.lua.table_from({0: self.hp_max[0], 1: self.hp_max[1]})
         snap = self.lua.table(
             round=self.round,
             timer=self.timer,
+            **extra,
             hp=self.lua.table_from({0: self.hp[0], 1: self.hp[1]}),
             guard=self.lua.table_from({0: self.guard[0], 1: self.guard[1]}),
             keys=self.lua.table_from({0: self.keys[0], 1: self.keys[1]}),
@@ -167,6 +172,35 @@ class EngineRules(unittest.TestCase):
         self.assertEqual(writes, {1: 868})
 
 
+class RealMaxHealth(unittest.TestCase):
+    def setUp(self):
+        self.lua, self.g = load_engine()
+        self.m = Match(self.lua, self.g)
+
+    def test_rage_uses_game_max_health_even_if_script_started_mid_round(self):
+        self.m.hp = [150, 1000]  # script "starts" with P1 already low: highest-seen would be 150
+        self.m.hp_max = [1000, 1000]
+        self.m.tick()
+        self.m.tick()
+        self.m.hp[1] -= 100
+        self.assertEqual(self.m.tick(), {1: 885})  # P1 at 15% of the real max is in Rage
+
+    def test_fallback_without_game_max_would_miss_that_rage(self):
+        self.m.hp = [150, 1000]  # no hp_max given
+        self.m.tick()
+        self.m.tick()
+        self.m.hp[1] -= 100
+        self.assertEqual(self.m.tick(), {})
+
+    def test_chip_uses_game_max_health(self):
+        self.m.hp_max = [10000, 10000]
+        self.m.hp = [10000, 6000]
+        self.m.tick()
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.assertEqual(self.m.tick(guard=[0, 12]), {1: 5800})  # 2% of 10000 = 200
+
+
 class GeneratedFiles(unittest.TestCase):
     def test_both_files_compile(self):
         lua = LuaRuntime()
@@ -236,8 +270,8 @@ FAKE_REFRAMEWORK = r"""
 -- A fake REFramework: just enough of re / sdk / imgui / json / reframework for the glue code to run.
 fake = { frame_cbs = {}, ui_cbs = {}, saved = {}, keys = {}, ui_text = {}, clicks = {} }
 players = {
-  [0] = { vital_new = 1000, guard_time = 0, combo_dm_air = 0 },
-  [1] = { vital_new = 1000, guard_time = 0, combo_dm_air = 0 },
+  [0] = { vital_new = 1000, vital_max = 1000, guard_time = 0, combo_dm_air = 0 },
+  [1] = { vital_new = 1000, vital_max = 1000, guard_time = 0, combo_dm_air = 0 },
 }
 battle = {
   Round = { RoundNo = 1 }, Game = { stage_timer = 0 },
@@ -292,6 +326,37 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.frame(lua)
         self.assertEqual(lua.eval("players[1].vital_new"), 885)
 
+    def test_mod_uses_vital_max_from_game_objects(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("players[0].vital_max = 10000; players[1].vital_max = 10000; players[0].vital_new = 1500; players[1].vital_new = 10000")
+        self.frame(lua)  # started with P1 at 15% of real max
+        lua.execute("battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("players[1].vital_new = 9000; battle.Game.stage_timer = 2")
+        self.frame(lua)
+        self.assertEqual(lua.eval("players[1].vital_new"), 8850)
+
+    def test_mod_survives_missing_vital_max(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("players[0].vital_max = nil; players[1].vital_max = nil")
+        self.frame(lua)
+        lua.execute("battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertNotIn("Last error", joined)
+
+    def test_ui_counts_bonus_writes(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("players[0].vital_new = 100; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 2")
+        self.frame(lua)
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertIn("Bonus health writes: 1 (last: P2 health 900 -> 885)", joined)
+
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")
         lua.execute("fake.no_battle = true")
@@ -318,6 +383,44 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.assertTrue(by_id["hp_now"]["ok"])
         self.assertEqual(len(by_id["hp_now"]["reads"]), 2)
         self.assertTrue(by_id["key_state"]["ok"])
+
+    def run_write_test(self, lua, frames=125):
+        lua.execute("fake.press = 'Run write test (takes 1 health point from P1)'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")
+        for _ in range(frames):
+            self.frame(lua)
+        return lua.eval('fake.saved["sf6_tekken/write_test_report.json"]')
+
+    def test_write_test_reports_a_kept_write(self):
+        lua = self.boot("sf6_tekken_probe.lua")
+        report = self.run_write_test(lua)
+        self.assertIsNotNone(report)
+        res = list(report.results.values())
+        self.assertEqual([r["id"] for r in res], ["hp_now"])  # only the writable hook
+        r = res[0]
+        self.assertTrue(r["write_ok"])
+        self.assertEqual((r["before"], r["after_write"], r["after_1_frame"], r["after_30_frames"], r["after_120_frames"]),
+                         (1000, 999, 999, 999, 999))
+
+    def test_write_test_reports_a_reverted_write(self):
+        lua = self.boot("sf6_tekken_probe.lua")
+        # the game puts the old value back on the next frame
+        lua.execute("table.insert(fake.frame_cbs, 1, function() players[0].vital_new = 1000 end)")
+        report = self.run_write_test(lua)
+        r = list(report.results.values())[0]
+        self.assertEqual(r["after_write"], 999)
+        self.assertEqual(r["after_1_frame"], 1000)
+        self.assertEqual(r["after_120_frames"], 1000)
+
+    def test_write_test_reports_a_refused_write(self):
+        lua = self.boot("sf6_tekken_probe.lua")
+        lua.execute("""
+            local real = players[0]
+            players[0] = setmetatable({}, { __index = real, __newindex = function() error("read-only field") end })
+        """)
+        report = self.run_write_test(lua)
+        r = list(report.results.values())[0]
+        self.assertFalse(r["write_ok"])
+        self.assertIn("read-only", r["error"])
 
     def test_probe_flags_a_wrong_field_name(self):
         lua = self.boot("sf6_tekken_probe.lua")

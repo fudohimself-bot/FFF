@@ -36,6 +36,8 @@ class Match:
         self.hp = [1000, 1000]
         self.hp_max = None  # None = game gave no max health (engine falls back to highest seen)
         self.guard = [0, 0]
+        self.hitstun = [0, 0]
+        self.send_hitstun = True
         self.keys = [False, False]
 
     def tick(self, advance=True, **kw):
@@ -45,6 +47,8 @@ class Match:
         for k, v in kw.items():
             setattr(self, k, v)
         extra = {}
+        if self.send_hitstun:
+            extra["hitstun"] = self.lua.table_from({0: self.hitstun[0], 1: self.hitstun[1]})
         if self.hp_max is not None:
             extra["hp_max"] = self.lua.table_from({0: self.hp_max[0], 1: self.hp_max[1]})
         snap = self.lua.table(
@@ -93,11 +97,11 @@ class EngineRules(unittest.TestCase):
         self.m.tick(hp=[0, 1000])
         self.assertEqual(self.hit(1, 100), {})
 
-    def test_heat_key_starts_burst_and_boosts_damage(self):
+    def test_heat_key_starts_heat_but_gives_no_damage_bonus(self):
         self.m.tick(keys=[True, False])
         self.m.tick(keys=[False, False])
         self.assertTrue(self.g.Engine.heat_active(self.m.state, 0))
-        self.assertEqual(self.hit(1, 100), {1: 885})
+        self.assertEqual(self.hit(1, 100), {})  # Tekken 8 Heat has no general damage bonus
 
     def test_heat_expires_after_duration(self):
         self.m.tick(keys=[True, False])
@@ -106,23 +110,49 @@ class EngineRules(unittest.TestCase):
         self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
         self.assertEqual(self.hit(1, 100), {})
 
-    def test_heat_cooldown_blocks_reactivation(self):
+    def test_heat_cannot_be_used_twice_in_a_round(self):
         self.m.tick(keys=[True, False])
         for _ in range(610):
             self.m.tick(keys=[False, False])
-        self.m.tick(keys=[True, False])  # still cooling down
         self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
+        self.m.tick(keys=[True, False])  # second press in the same round
+        self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
+        self.assertFalse(self.g.Engine.heat_available(self.m.state, 0))
 
-    def test_heat_reactivates_after_cooldown(self):
+    def test_heat_is_available_again_next_round(self):
         self.m.tick(keys=[True, False])
-        for _ in range(600 + 1200 + 5):
+        for _ in range(610):
             self.m.tick(keys=[False, False])
+        self.m.tick(round=2, keys=[False, False])
+        self.assertTrue(self.g.Engine.heat_available(self.m.state, 0))
         self.m.tick(keys=[True, False])
         self.assertTrue(self.g.Engine.heat_active(self.m.state, 0))
 
+    def test_heat_timer_stops_while_opponent_is_in_hitstun(self):
+        self.m.tick(keys=[True, False])
+        for _ in range(100):
+            self.m.tick(keys=[False, False], hitstun=[0, 20])  # P2 is being hit
+        self.assertEqual(self.g.Engine.heat_left(self.m.state, 0), 600)
+        for _ in range(50):
+            self.m.tick(hitstun=[0, 0])
+        self.assertEqual(self.g.Engine.heat_left(self.m.state, 0), 550)
+
+    def test_own_hitstun_does_not_stop_your_heat_timer(self):
+        self.m.tick(keys=[True, False])
+        for _ in range(10):
+            self.m.tick(keys=[False, False], hitstun=[20, 0])  # P1 is being hit
+        self.assertEqual(self.g.Engine.heat_left(self.m.state, 0), 590)
+
+    def test_missing_hitstun_data_does_not_stop_the_timer(self):
+        self.m.send_hitstun = False
+        self.m.tick(keys=[True, False])
+        for _ in range(10):
+            self.m.tick(keys=[False, False])
+        self.assertEqual(self.g.Engine.heat_left(self.m.state, 0), 590)
+
     def test_held_key_does_not_retrigger(self):
         self.m.tick(keys=[True, False])
-        for _ in range(600 + 1200 + 5):
+        for _ in range(600 + 5):
             self.m.tick(keys=[True, False])
         self.assertFalse(self.g.Engine.heat_active(self.m.state, 0))
 
@@ -165,12 +195,53 @@ class EngineRules(unittest.TestCase):
         self.m.tick(hp=[190, 800])  # P2 recovers health
         self.assertEqual(self.m.tick(hp=[190, 800]), {})
 
-    def test_rage_and_heat_stack(self):
-        self.m.tick(hp=[100, 1000])
+    def test_heat_adds_nothing_on_top_of_rage(self):
+        self.m.tick(hp=[100, 1000])  # P1 in Rage
         self.m.tick(keys=[True, False])
         self.m.tick(keys=[False, False])
-        writes = self.hit(1, 100)  # 1.15 * 1.15 = 1.3225 -> 32 extra
-        self.assertEqual(writes, {1: 868})
+        self.assertEqual(self.hit(1, 100), {1: 885})  # only Rage's 15%
+
+    def test_chip_cannot_ko_and_is_recoverable(self):
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.assertEqual(self.m.tick(guard=[0, 12]), {1: 980})
+        self.assertEqual(self.m.state["p"][1]["pool"], 20)
+
+    def test_landing_an_attack_wins_back_recoverable_health(self):
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.m.tick(guard=[0, 12])  # P2 chipped for 20
+        self.m.tick(guard=[0, 0])
+        self.m.hp[0] -= 10  # P1 takes a hit, which counts as P2 landing an attack
+        writes = self.m.tick()
+        self.assertEqual(writes, {1: 990})  # P2 regains 1% of max (10), pool 20 -> 10
+        self.assertEqual(self.m.state["p"][1]["pool"], 10)
+
+    def test_recovery_is_capped_by_what_chip_took(self):
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.m.tick(guard=[0, 12])  # pool 20
+        self.m.tick(guard=[0, 0])
+        for _ in range(5):
+            self.m.hp[0] -= 10
+            self.m.tick()
+        self.assertEqual(self.m.hp[1], 1000)  # back to full, never above max
+        self.assertEqual(self.m.state["p"][1]["pool"], 0)
+
+    def test_recoverable_pool_resets_each_round(self):
+        self.m.tick(keys=[True, False])
+        self.m.tick(keys=[False, False])
+        self.m.tick(guard=[0, 12])
+        self.m.tick(round=2, guard=[0, 0])
+        self.assertEqual(self.m.state["p"][1]["pool"], 0)
+
+    def test_blocking_a_move_counts_as_landing_for_recovery(self):
+        self.m.tick(keys=[False, True])  # P2 Heat on
+        self.m.tick(keys=[False, False])
+        self.m.tick(guard=[12, 0])  # P1 blocks P2's attack: chipped 20, pool 20
+        self.m.tick(guard=[0, 0])
+        self.m.tick(guard=[0, 12])  # P2's block starts: P1 landed an attack, regains
+        self.assertEqual(self.m.hp[0], 990)
 
 
 class RoundAndDebug(unittest.TestCase):
@@ -192,7 +263,7 @@ class RoundAndDebug(unittest.TestCase):
         self.m.tick(keys=[True, False])
         for _ in range(605):
             self.m.tick(keys=[False, False])
-        self.assertIn("P1 Heat expired normally after 600 ticks", str(self.m.state["last_event"]))
+        self.assertIn("P1 Heat ended: timer ran out after 600 running ticks", str(self.m.state["last_event"]))
 
     def test_heat_cleared_by_reset_is_recorded_with_the_numbers(self):
         self.m.tick(keys=[True, False])
@@ -209,7 +280,7 @@ class RoundAndDebug(unittest.TestCase):
             self.m.tick(keys=[False, False])
         e = self.g.Engine
         self.assertEqual(e.heat_left(self.m.state, 0), 500)
-        self.assertEqual(e.heat_ready_in(self.m.state, 0), 1700 - 0)
+        self.assertFalse(e.heat_available(self.m.state, 0))
 
     def test_small_timer_wobble_does_not_reset(self):
         self.m.tick(keys=[True, False])
@@ -226,8 +297,9 @@ class RoundAndDebug(unittest.TestCase):
 
     def test_debug_start_heat_without_key(self):
         self.g.Engine.start_heat(self.m.state, 0)
-        self.m.hp[1] -= 100
-        self.assertEqual(self.m.tick(), {1: 885})
+        self.assertTrue(self.g.Engine.heat_active(self.m.state, 0))
+        self.m.tick(guard=[0, 12])
+        self.assertEqual(self.m.hp[1], 980)  # chip, as Heat does
 
 
 class RealMaxHealth(unittest.TestCase):
@@ -328,8 +400,8 @@ FAKE_REFRAMEWORK = r"""
 -- A fake REFramework: just enough of re / sdk / imgui / json / reframework for the glue code to run.
 fake = { frame_cbs = {}, ui_cbs = {}, saved = {}, keys = {}, ui_text = {}, clicks = {} }
 players = {
-  [0] = { vital_new = 1000, vital_max = 1000, guard_time = 0, combo_dm_air = 0 },
-  [1] = { vital_new = 1000, vital_max = 1000, guard_time = 0, combo_dm_air = 0 },
+  [0] = { vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
+  [1] = { vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
 }
 battle = {
   Round = { RoundNo = 1 }, Game = { stage_timer = 0 },
@@ -373,16 +445,25 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.frame(lua)
         self.assertEqual(lua.eval("players[1].vital_new"), 885)
 
-    def test_mod_applies_heat_key_from_keyboard(self):
+    def test_mod_starts_heat_from_keyboard(self):
         lua = self.boot("sf6_tekken_mode.lua")
         self.frame(lua)
         lua.execute("fake.keys[112] = true; battle.Game.stage_timer = 1")
         self.frame(lua)
         lua.execute("fake.keys[112] = false; battle.Game.stage_timer = 2")
         self.frame(lua)
-        lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 3")
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertIn("P1  rage: false  heat: true", joined)
+
+    def test_mod_reads_hitstun_and_shows_it(self):
+        lua = self.boot("sf6_tekken_mode.lua")
         self.frame(lua)
-        self.assertEqual(lua.eval("players[1].vital_new"), 885)
+        lua.execute("players[1].damage_time = 22; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
+        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
+        self.assertIn("Hitstun timer now P1 0 / P2 22, highest seen P1 0 / P2 22", joined)
 
     def test_mod_uses_vital_max_from_game_objects(self):
         lua = self.boot("sf6_tekken_mode.lua")

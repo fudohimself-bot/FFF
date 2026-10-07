@@ -14,7 +14,8 @@ NA = "n/a"
 # Columns a row of each kind must really fill (not "n/a") before it can be built.
 KIND_REQUIRES = {
     "rage": ["hp_threshold_pct", "damage_mult"],
-    "heat": ["damage_mult", "duration_ticks", "cooldown_ticks", "chip_pct_of_max", "key_p1", "key_p2"],
+    "heat": ["damage_mult", "duration_ticks", "uses_per_round", "pause_while_opponent_in_hitstun", "chip_pct_of_max",
+             "chip_can_ko", "recover_pct_of_max_per_landed_attack", "key_p1", "key_p2"],
     "juggle_scaling": [],
 }
 # Hooks a kind writes to: the hook row must allow writing.

@@ -14,6 +14,10 @@ local ROWS = {
       ["duration_ticks"] = "n/a",
       ["cooldown_ticks"] = "n/a",
       ["chip_pct_of_max"] = "n/a",
+      ["uses_per_round"] = "n/a",
+      ["pause_while_opponent_in_hitstun"] = "n/a",
+      ["chip_can_ko"] = "n/a",
+      ["recover_pct_of_max_per_landed_attack"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -32,10 +36,14 @@ local ROWS = {
       ["kind"] = "heat",
       ["trigger"] = "key",
       ["hp_threshold_pct"] = "n/a",
-      ["damage_mult"] = 1.15,
+      ["damage_mult"] = 1.0,
       ["duration_ticks"] = 600,
-      ["cooldown_ticks"] = 1200,
+      ["cooldown_ticks"] = "n/a",
       ["chip_pct_of_max"] = 2.0,
+      ["uses_per_round"] = 1,
+      ["pause_while_opponent_in_hitstun"] = true,
+      ["chip_can_ko"] = false,
+      ["recover_pct_of_max_per_landed_attack"] = 1.0,
       ["key_p1"] = 112,
       ["key_p2"] = 113,
       ["uses_hooks"] = {
@@ -44,11 +52,12 @@ local ROWS = {
         "hp_now",
         "hp_max",
         "guard_time",
+        "hitstun",
         "key_state"
       },
       ["status"] = "implemented",
-      ["verified"] = true,
-      ["note"] = "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) for a timed burst of extra damage plus chip damage on blocked hits, then a cooldown. Ticks are match ticks, about 60 per second. Keyboard only. In-game 2026-10-07: starting Heat from the debug button logged a +15% bonus (P2 8176 -> 8046). Chip damage on block verified in Training mode (8 chip hits counted). The F1 key starts Heat (confirmed by the user in game). An early turn-off was reported, then withdrawn by the user: Heat ends after its 10 second duration as designed. The panel still records why Heat ended."
+      ["verified"] = false,
+      ["note"] = "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) to start Heat. It can be used once per round and lasts 10 seconds of running time (600 match ticks, about 60 per second); the timer stops while the opponent is in hitstun. Heat gives no damage bonus. A blocked hit costs the blocker chip damage that cannot KO; it is recoverable and is won back when the chipped fighter lands attacks. Not possible here: Heat Smash, Heat Dash, Heat Burst (2+3) input and Engager moves. Earlier version (+15% damage, 20 second cooldown, permanent chip) was verified in game; this version is a redesign and is untested."
     }
   },
   ["hooks"] = {
@@ -164,6 +173,23 @@ local ROWS = {
       ["read_verified"] = true,
       ["write_verified"] = "n/a",
       ["evidence"] = "Probe 2026-10-07: both players read 10000."
+    },
+    {
+      ["id"] = "hitstun",
+      ["kind"] = "field",
+      ["path_steps"] = {
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "damage_time"
+      },
+      ["access"] = "r",
+      ["value_type"] = "int",
+      ["purpose"] = "Tell when a fighter is in hitstun, so the opponent's Heat timer pauses while they are being hit (Tekken 8: the Heat timer stops while the opponent is hit)",
+      ["source"] = "Fighter field list from the probe; SF6_replay_capture reads it as hitstun",
+      ["read_verified"] = false,
+      ["write_verified"] = "n/a",
+      ["evidence"] = "Field name seen in the probe's field list; its value during hitstun has not been seen yet."
     }
   }
 }
@@ -174,12 +200,13 @@ for _, r in ipairs(ROWS.mechanics) do MECH[r.id] = r end
 -- ---------------------------------------------------------------------------
 -- Rules. Pure logic: takes a snapshot of the match, returns the health writes
 -- to make. No game calls in here, so it can be tested without the game.
---   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, hp_max = {[0]=n,[1]=n} (optional), guard = {[0]=n,[1]=n}, keys = {[0]=bool,[1]=bool} }
+--   snap = { round = n, timer = n, hp = {[0]=n,[1]=n}, hp_max = {[0]=n,[1]=n} (optional), guard = {[0]=n,[1]=n}, hitstun = {[0]=n,[1]=n} (optional), keys = {[0]=bool,[1]=bool} }
 -- ---------------------------------------------------------------------------
 local Engine = {}
 
 local function new_player()
-    return { heat_start = 0, max_hp = 0, last_hp = nil, last_guard = 0, rage = false, heat_until = 0, heat_ready_at = 0, key_prev = false }
+    return { max_hp = 0, last_hp = nil, last_guard = 0, rage = false, key_prev = false,
+             heat_left = 0, heat_used = false, heat_paused = 0, heat_ran = 0, pool = 0 }
 end
 
 function Engine.new_state()
@@ -198,24 +225,25 @@ end
 -- Debug switches for testing in the real game without having to get low on health or press the key.
 Engine.debug = { force_rage = { [0] = false, [1] = false } }
 
+-- Heat (Tekken 8): once per round, a timer that only runs while the opponent is not in hitstun.
 function Engine.start_heat(st, i)
     local p = st.p[i]
-    local heat = MECH.heat
-    p.heat_start = st.tick
-    p.heat_until = st.tick + heat.duration_ticks
-    p.heat_ready_at = p.heat_until + heat.cooldown_ticks
+    p.heat_left = MECH.heat.duration_ticks
+    p.heat_used = true
+    p.heat_paused = 0
+    p.heat_ran = 0
 end
 
 function Engine.heat_active(st, i)
-    return st.tick < st.p[i].heat_until
+    return st.p[i].heat_left > 0
 end
 
 function Engine.heat_left(st, i)
-    return math.max(0, st.p[i].heat_until - st.tick)
+    return st.p[i].heat_left
 end
 
-function Engine.heat_ready_in(st, i)
-    return math.max(0, st.p[i].heat_ready_at - st.tick)
+function Engine.heat_available(st, i)
+    return not st.p[i].heat_used
 end
 
 -- Returns a table { [playerIndex] = newHealth } for every health write to make this call.
@@ -226,9 +254,7 @@ function Engine.step(st, snap)
     -- (probe screenshots showed the round number reading 0 in a later round, so it can't be relied on alone).
     local timer_jumped_back = st.last_timer ~= nil and snap.timer < st.last_timer - 30
     local was_heat = { [0] = Engine.heat_active(st, 0), [1] = Engine.heat_active(st, 1) }
-    local did_reset = false
     if snap.round ~= st.round or timer_jumped_back then
-        did_reset = true
         for i = 0, 1 do
             if was_heat[i] then
                 st.last_event = string.format("P%d Heat CLEARED by a reset: timer %s -> %s, round %s -> %s",
@@ -244,10 +270,23 @@ function Engine.step(st, snap)
     if snap.timer == st.last_timer then return writes end
     st.last_timer = snap.timer
     st.tick = st.tick + 1
-    if not did_reset then
+
+    -- Heat timer: runs only while the opponent is not in hitstun (when the sheet says so).
+    if enabled("heat") then
         for i = 0, 1 do
-            if was_heat[i] and not Engine.heat_active(st, i) then
-                st.last_event = string.format("P%d Heat expired normally after %d ticks", i + 1, st.p[i].heat_until - st.p[i].heat_start)
+            local p = st.p[i]
+            if p.heat_left > 0 then
+                local stunned = snap.hitstun ~= nil and (snap.hitstun[1 - i] or 0) > 0
+                if MECH.heat.pause_while_opponent_in_hitstun and stunned then
+                    p.heat_paused = p.heat_paused + 1
+                else
+                    p.heat_left = p.heat_left - 1
+                    p.heat_ran = p.heat_ran + 1
+                    if p.heat_left == 0 then
+                        st.last_event = string.format("P%d Heat ended: timer ran out after %d running ticks (paused %d ticks while the opponent was hit)",
+                            i + 1, p.heat_ran, p.heat_paused)
+                    end
+                end
             end
         end
     end
@@ -262,18 +301,19 @@ function Engine.step(st, snap)
         end
     end
 
-    -- Heat: key press starts a timed burst, then a cooldown.
+    -- Heat: a key press starts it, once per round (a new round, or a timer reset, gives it back).
     if enabled("heat") then
-        local heat = MECH.heat
         for i = 0, 1 do
             local p = st.p[i]
             local down = snap.keys[i] == true
-            if down and not p.key_prev and st.tick >= p.heat_ready_at and not Engine.heat_active(st, i) then
+            if down and not p.key_prev and not p.heat_used and not Engine.heat_active(st, i) then
                 Engine.start_heat(st, i)
             end
             p.key_prev = down
         end
     end
+
+    local landed = { [0] = false, [1] = false }  -- who landed an attack this tick (hit or block)
 
     -- Bonus damage: any health the victim lost since last tick is scaled up by the attacker's Rage and Heat.
     for v = 0, 1 do
@@ -281,6 +321,7 @@ function Engine.step(st, snap)
         local last = st.p[v].last_hp
         if last ~= nil and hp[v] < last then
             local drop = last - hp[v]
+            landed[a] = true
             local mult = 1.0
             if enabled("rage") and st.p[a].rage then mult = mult * MECH.rage.damage_mult end
             if enabled("heat") and Engine.heat_active(st, a) then mult = mult * MECH.heat.damage_mult end
@@ -295,18 +336,41 @@ function Engine.step(st, snap)
         end
     end
 
-    -- Chip damage: a fighter who starts blocking while the attacker is in Heat loses a slice of max health (never the last point).
+    -- Blocks: an attacker whose attack was just blocked has landed an attack. In Heat it also chips the blocker:
+    -- damage that cannot KO (when the sheet says so) and goes into the blocker's recoverable pool.
+    for v = 0, 1 do
+        local a = 1 - v
+        local started_block = (snap.guard[v] or 0) > 0 and (st.p[v].last_guard or 0) == 0
+        if started_block then
+            landed[a] = true
+            if enabled("heat") and Engine.heat_active(st, a) then
+                local floor_hp = MECH.heat.chip_can_ko and 0 or 1
+                if hp[v] > floor_hp then
+                    local chip = round_half_up(st.p[v].max_hp * MECH.heat.chip_pct_of_max / 100.0)
+                    local new_hp = math.max(floor_hp, hp[v] - chip)
+                    if new_hp ~= hp[v] then
+                        st.p[v].pool = st.p[v].pool + (hp[v] - new_hp)
+                        hp[v] = new_hp
+                        writes[v] = new_hp
+                        st.chip_count = st.chip_count + 1
+                    end
+                end
+            end
+        end
+    end
+
+    -- Recoverable health: a fighter who lands an attack wins back some of what chip took from them.
     if enabled("heat") then
-        for v = 0, 1 do
-            local a = 1 - v
-            local started_block = (snap.guard[v] or 0) > 0 and (st.p[v].last_guard or 0) == 0
-            if started_block and Engine.heat_active(st, a) and hp[v] > 1 then
-                local chip = round_half_up(st.p[v].max_hp * MECH.heat.chip_pct_of_max / 100.0)
-                local new_hp = math.max(1, hp[v] - chip)
-                if new_hp ~= hp[v] then
-                    hp[v] = new_hp
-                    writes[v] = new_hp
-                    st.chip_count = st.chip_count + 1
+        for a = 0, 1 do
+            local p = st.p[a]
+            if landed[a] and p.pool > 0 and hp[a] > 0 then
+                local want = math.min(p.pool, round_half_up(p.max_hp * MECH.heat.recover_pct_of_max_per_landed_attack / 100.0))
+                local new_hp = math.min(p.max_hp, hp[a] + want)
+                local gained = new_hp - hp[a]
+                if gained > 0 then
+                    p.pool = p.pool - gained
+                    hp[a] = new_hp
+                    writes[a] = new_hp
                 end
             end
         end
@@ -338,7 +402,7 @@ if re ~= nil and sdk ~= nil then
     local state = Engine.new_state()
     local last_error = nil
     local last_status = "waiting for a match"
-    local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 } }
+    local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 } }
 
     local function num(v)
         local n = tonumber(v)
@@ -352,12 +416,14 @@ if re ~= nil and sdk ~= nil then
         local round = t:get_field("Round"):get_data(nil).RoundNo
         local timer = t:get_field("Game"):get_data(nil).stage_timer
         local players = t:get_field("Player"):get_data(nil).mcPlayer
-        local snap = { round = num(round), timer = num(timer), hp = {}, hp_max = {}, guard = {}, keys = {} }
+        local snap = { round = num(round), timer = num(timer), hp = {}, hp_max = {}, guard = {}, hitstun = {}, keys = {} }
         for i = 0, 1 do
             snap.hp[i] = num(players[i].vital_new)
             snap.guard[i] = num(players[i].guard_time)
             local ok_max, mx = pcall(function() return players[i].vital_max end)
             snap.hp_max[i] = ok_max and num(mx) or 0
+            local ok_hs, hs = pcall(function() return players[i].damage_time end)
+            snap.hitstun[i] = ok_hs and num(hs) or 0
         end
         snap.keys[0] = reframework:is_key_down(MECH.heat.key_p1) == true
         snap.keys[1] = reframework:is_key_down(MECH.heat.key_p2) == true
@@ -384,6 +450,8 @@ if re ~= nil and sdk ~= nil then
         for i = 0, 1 do
             stats.guard_now[i] = snap.guard[i]
             if snap.guard[i] > stats.guard_max[i] then stats.guard_max[i] = snap.guard[i] end
+            stats.hit_now[i] = snap.hitstun[i]
+            if snap.hitstun[i] > stats.hit_max[i] then stats.hit_max[i] = snap.hitstun[i] end
         end
         for i, new_hp in pairs(writes) do
             local before = snap.hp[i]
@@ -408,15 +476,17 @@ if re ~= nil and sdk ~= nil then
                 local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                 if changed then MECH[id].enabled = value end
             end
+            imgui.text(string.format("Hitstun timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
+                stats.hit_now[0], stats.hit_now[1], stats.hit_max[0], stats.hit_max[1]))
             imgui.text("Last Heat event: " .. state.last_event)
             imgui.text("Debug (for testing only):")
             local fchanged, fvalue = imgui.checkbox("force P1 Rage on", Engine.debug.force_rage[0])
             if fchanged then Engine.debug.force_rage[0] = fvalue end
             if imgui.button("start P1 Heat now (no key)") then Engine.start_heat(state, 0) end
             for i = 0, 1 do
-                imgui.text(string.format("P%d  rage: %s  heat: %s (left %d ticks, ready again in %d)", i + 1,
+                imgui.text(string.format("P%d  rage: %s  heat: %s (%d ticks left, available this round: %s)  recoverable: %d", i + 1,
                     tostring(state.p[i].rage), tostring(Engine.heat_active(state, i)),
-                    Engine.heat_left(state, i), Engine.heat_ready_in(state, i)))
+                    Engine.heat_left(state, i), tostring(Engine.heat_available(state, i)), state.p[i].pool))
             end
             imgui.tree_pop()
         end

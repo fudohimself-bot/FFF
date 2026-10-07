@@ -2,14 +2,14 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: Rage and Heat verified in game.** In real offline matches (2026-10-07) every field the mod needs reads correctly, health writes are kept, Rage turns on at low health, and Rage and Heat hits both logged a +15% bonus. Chip damage on a blocked hit worked in Training mode, the F1 key starts Heat, and Heat ends after its 10 seconds as designed. Not built yet: juggle scaling. Still unknown: long-session behaviour of SF6's rollback, and whether the on-screen health bar always follows the written value. The rules are also tested against a fake match and a fake REFramework (49 tests).
+**Status: Rage verified in game. Heat was just redesigned to follow Tekken 8 and is untested.** In real offline matches (2026-10-07) every field the mod needs read correctly, health writes were kept, Rage turned on at low health, and the first version of Heat (+15% damage, cooldown, permanent chip, F1 key) worked. The new Heat has not been played yet: once per round, a timer that stops while the opponent is in hitstun (this reads a field, `damage_time`, whose values we have not seen), and chip that cannot KO and is won back by landing attacks. Not built: juggle scaling, and Tekken's Heat Smash, Heat Dash, Heat Burst input and Engager moves (they are move-set changes). The rules are also tested against a fake match and a fake REFramework (58 tests).
 
 ## What it adds
 
 | System | What it does | Status |
 |---|---|---|
-| Rage | A fighter at or under 20% health deals 15% more damage | built, verified in game |
-| Heat | P1 presses **F1** (P2 **F2**) for 10 seconds of +15% damage and chip damage on blocked hits, then a 20 second cooldown. Keyboard only: REFramework can't read gamepad buttons | built, verified in game |
+| Rage | A fighter at or under 20% health deals 15% more damage (a Tekken-flavoured guess, not Tekken's exact numbers) | built, verified in game |
+| Heat | P1 presses **F1** (P2 **F2**) to start Heat: once per round, 10 seconds of running time that stops while the opponent is in hitstun. No damage bonus. A blocked hit costs the blocker chip damage (2% of max health, an estimate) that can't KO and is won back when they land attacks. Keyboard only: REFramework can't read gamepad buttons | redesigned to follow Tekken 8, untested in game |
 | Juggle scaling | Longer air combos | research only, not built |
 
 Both built systems add their bonus by lowering the victim's health after a hit. SF6 accepted these writes in real offline matches. What isn't known yet is how the game's rollback system behaves over a long session, and whether the on-screen health bar always follows the written value.

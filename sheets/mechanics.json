@@ -1,6 +1,6 @@
 {
   "sheet": "mechanics",
-  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled.",
+  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet.",
   "columns": [
     "id",
     "enabled",
@@ -11,6 +11,10 @@
     "duration_ticks",
     "cooldown_ticks",
     "chip_pct_of_max",
+    "uses_per_round",
+    "pause_while_opponent_in_hitstun",
+    "chip_can_ko",
+    "recover_pct_of_max_per_landed_attack",
     "key_p1",
     "key_p2",
     "uses_hooks",
@@ -29,6 +33,10 @@
       "duration_ticks": "n/a",
       "cooldown_ticks": "n/a",
       "chip_pct_of_max": "n/a",
+      "uses_per_round": "n/a",
+      "pause_while_opponent_in_hitstun": "n/a",
+      "chip_can_ko": "n/a",
+      "recover_pct_of_max_per_landed_attack": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -47,10 +55,14 @@
       "kind": "heat",
       "trigger": "key",
       "hp_threshold_pct": "n/a",
-      "damage_mult": 1.15,
+      "damage_mult": 1.0,
       "duration_ticks": 600,
-      "cooldown_ticks": 1200,
+      "cooldown_ticks": "n/a",
       "chip_pct_of_max": 2.0,
+      "uses_per_round": 1,
+      "pause_while_opponent_in_hitstun": true,
+      "chip_can_ko": false,
+      "recover_pct_of_max_per_landed_attack": 1.0,
       "key_p1": 112,
       "key_p2": 113,
       "uses_hooks": [
@@ -59,11 +71,12 @@
         "hp_now",
         "hp_max",
         "guard_time",
+        "hitstun",
         "key_state"
       ],
       "status": "implemented",
-      "verified": true,
-      "note": "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) for a timed burst of extra damage plus chip damage on blocked hits, then a cooldown. Ticks are match ticks, about 60 per second. Keyboard only. In-game 2026-10-07: starting Heat from the debug button logged a +15% bonus (P2 8176 -> 8046). Chip damage on block verified in Training mode (8 chip hits counted). The F1 key starts Heat (confirmed by the user in game). An early turn-off was reported, then withdrawn by the user: Heat ends after its 10 second duration as designed. The panel still records why Heat ended."
+      "verified": false,
+      "note": "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) to start Heat. It can be used once per round and lasts 10 seconds of running time (600 match ticks, about 60 per second); the timer stops while the opponent is in hitstun. Heat gives no damage bonus. A blocked hit costs the blocker chip damage that cannot KO; it is recoverable and is won back when the chipped fighter lands attacks. Not possible here: Heat Smash, Heat Dash, Heat Burst (2+3) input and Engager moves. Earlier version (+15% damage, 20 second cooldown, permanent chip) was verified in game; this version is a redesign and is untested."
     },
     {
       "id": "juggle_scaling",
@@ -75,6 +88,10 @@
       "duration_ticks": "n/a",
       "cooldown_ticks": "n/a",
       "chip_pct_of_max": "n/a",
+      "uses_per_round": "n/a",
+      "pause_while_opponent_in_hitstun": "n/a",
+      "chip_can_ko": "n/a",
+      "recover_pct_of_max_per_landed_attack": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [

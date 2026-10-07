@@ -126,6 +126,23 @@
       "read_verified": true,
       "write_verified": "n/a",
       "evidence": "Probe 2026-10-07: both players read 10000."
+    },
+    {
+      "id": "hitstun",
+      "kind": "field",
+      "path_steps": [
+        "Player",
+        "mcPlayer",
+        "[i]",
+        "damage_time"
+      ],
+      "access": "r",
+      "value_type": "int",
+      "purpose": "Tell when a fighter is in hitstun, so the opponent's Heat timer pauses while they are being hit (Tekken 8: the Heat timer stops while the opponent is hit)",
+      "source": "Fighter field list from the probe; SF6_replay_capture reads it as hitstun",
+      "read_verified": false,
+      "write_verified": "n/a",
+      "evidence": "Field name seen in the probe's field list; its value during hitstun has not been seen yet."
     }
   ]
 }

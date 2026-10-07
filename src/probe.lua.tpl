@@ -100,7 +100,7 @@ if re ~= nil and sdk ~= nil then
         report_text = string.format("%d hooks checked, %d failed. Saved: %s", #report.results, bad, tostring(saved))
     end
 
-    -- Write test: for every hook the sheet says is writable, take 1 off player 1's value, then read it back
+    -- Write test: for every hook the sheet says is writable, add 1 to player 1's value, then read it back
     -- right away and again 30 and 120 frames later. Shows whether the game keeps the write or puts the old value back.
     local pending = nil
 
@@ -126,7 +126,7 @@ if re ~= nil and sdk ~= nil then
                 if ok and parent ~= nil then
                     local before = tonumber(parent[key])
                     t.before = before
-                    local okw, errw = pcall(function() parent[key] = before - 1 end)
+                    local okw, errw = pcall(function() parent[key] = before + 1 end)
                     t.write_ok = okw
                     if not okw then t.error = tostring(errw) end
                     t.after_write = tonumber(parent[key])
@@ -175,7 +175,7 @@ if re ~= nil and sdk ~= nil then
     re.on_draw_ui(function()
         if imgui.tree_node("SF6 Tekken Probe") then
             imgui.text("Press during an offline match.")
-            if imgui.button("Run write test (takes 1 health point from P1)") then
+            if imgui.button("Run write test (adds 1 to a P1 value)") then
                 local ok, err = pcall(start_write_test)
                 if ok then
                     report_text = "write test running, wait 3 seconds..."

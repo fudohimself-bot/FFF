@@ -130,9 +130,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Tell when a fighter is in hitstun, so the opponent's Heat timer pauses while they are being hit (Tekken 8: the Heat timer stops while the opponent is hit)",
     ["source"] = "Fighter field list from the probe; SF6_replay_capture reads it as hitstun",
-    ["read_verified"] = false,
+    ["read_verified"] = true,
     ["write_verified"] = "n/a",
-    ["evidence"] = "Field name seen in the probe's field list; its value during hitstun has not been seen yet."
+    ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest. Its value during hitstun has not been seen yet."
   },
   {
     ["id"] = "button_state",
@@ -147,9 +147,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "The game's own held-button bits for each fighter, so Heat can later be started from a gamepad button combo (Tekken's Heat Burst is 2+3) instead of only a keyboard key",
     ["source"] = "Fighter field list from the probe; the meaning of the bits is not known yet",
-    ["read_verified"] = false,
+    ["read_verified"] = true,
     ["write_verified"] = "n/a",
-    ["evidence"] = "Field name seen in the probe's field list. Which bit is which button is unknown: the panel shows the live value so the bits can be decoded."
+    ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters with no buttons held. Which bit is which button is unknown."
   },
   {
     ["id"] = "global_speed",
@@ -164,7 +164,7 @@ local HOOKS = {
     ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
     ["read_verified"] = "n/a",
     ["write_verified"] = false,
-    ["evidence"] = "User test 2026-10-07: pressing the panel's test button did not visibly slow the game (whether the call errored is unknown). Either SF6 ignores global speed or the call was refused."
+    ["evidence"] = "Probe 2026-10-07: the call is available. User test: it did not visibly slow the game."
   },
   {
     ["id"] = "sleep_time",
@@ -179,9 +179,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Research: a candidate for the game's hit freeze, to make hits feel weightier",
     ["source"] = "Fighter field list from the probe; meaning unknown",
-    ["read_verified"] = false,
+    ["read_verified"] = true,
     ["write_verified"] = "n/a",
-    ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+    ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest. Behaviour during hits not seen."
   },
   {
     ["id"] = "damage_sleep",
@@ -196,9 +196,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Research: another candidate for the game's hit freeze",
     ["source"] = "Fighter field list from the probe; meaning unknown",
-    ["read_verified"] = false,
+    ["read_verified"] = true,
     ["write_verified"] = "n/a",
-    ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+    ["evidence"] = "Probe 2026-10-07: P1 read 0, P2 read 3 while a hit was fresh, so it moves around hits. Meaning (hit freeze?) not confirmed."
   },
   {
     ["id"] = "hit_stop",
@@ -209,13 +209,13 @@ local HOOKS = {
       "[i]",
       "hit_stop"
     },
-    ["access"] = "r",
+    ["access"] = "rw",
     ["value_type"] = "int",
-    ["purpose"] = "Research: the hit freeze field the community replay script reads; it was NOT in the fighter field list, so it may not exist on this object",
+    ["purpose"] = "The game's hit freeze counter (candidate): read to see it, and add a few frames to it on a landed hit so hits feel weightier",
     ["source"] = "SF6_replay_capture reads cPlayer[i].hit_stop",
-    ["read_verified"] = false,
-    ["write_verified"] = "n/a",
-    ["evidence"] = "Not in the probe's field list for the fighter object. The probe will say whether reading it works."
+    ["read_verified"] = true,
+    ["write_verified"] = false,
+    ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest, although the name was not in the fighter's field list (probably on a parent object). Whether it is the hit freeze, and whether writing it works, is untested."
   },
   {
     ["id"] = "scene_time_scale",
@@ -231,7 +231,7 @@ local HOOKS = {
     ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
     ["read_verified"] = "n/a",
     ["write_verified"] = false,
-    ["evidence"] = "None yet."
+    ["evidence"] = "Probe 2026-10-07: the call is available. User test: it did not visibly slow the game."
   },
   {
     ["id"] = "max_fps",
@@ -245,8 +245,8 @@ local HOOKS = {
     ["purpose"] = "Third way to slow the game: lower the frame cap, which slows anything that advances one step per frame; the original cap is restored afterwards",
     ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
     ["read_verified"] = "n/a",
-    ["write_verified"] = false,
-    ["evidence"] = "None yet."
+    ["write_verified"] = true,
+    ["evidence"] = "Probe 2026-10-07: reading the cap works. User test: this is the only method that visibly slowed the game, and the user was unsure how it felt (a lower frame rate looks choppy)."
   }
 }
 
@@ -345,7 +345,7 @@ if re ~= nil and sdk ~= nil then
         report_text = string.format("%d hooks checked, %d failed. Saved: %s", #report.results, bad, tostring(saved))
     end
 
-    -- Write test: for every hook the sheet says is writable, take 1 off player 1's value, then read it back
+    -- Write test: for every hook the sheet says is writable, add 1 to player 1's value, then read it back
     -- right away and again 30 and 120 frames later. Shows whether the game keeps the write or puts the old value back.
     local pending = nil
 
@@ -371,7 +371,7 @@ if re ~= nil and sdk ~= nil then
                 if ok and parent ~= nil then
                     local before = tonumber(parent[key])
                     t.before = before
-                    local okw, errw = pcall(function() parent[key] = before - 1 end)
+                    local okw, errw = pcall(function() parent[key] = before + 1 end)
                     t.write_ok = okw
                     if not okw then t.error = tostring(errw) end
                     t.after_write = tonumber(parent[key])
@@ -420,7 +420,7 @@ if re ~= nil and sdk ~= nil then
     re.on_draw_ui(function()
         if imgui.tree_node("SF6 Tekken Probe") then
             imgui.text("Press during an offline match.")
-            if imgui.button("Run write test (takes 1 health point from P1)") then
+            if imgui.button("Run write test (adds 1 to a P1 value)") then
                 local ok, err = pcall(start_write_test)
                 if ok then
                     report_text = "write test running, wait 3 seconds..."

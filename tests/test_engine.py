@@ -593,8 +593,8 @@ FAKE_REFRAMEWORK = r"""
 -- A fake REFramework: just enough of re / sdk / imgui / json / reframework for the glue code to run.
 fake = { frame_cbs = {}, ui_cbs = {}, saved = {}, keys = {}, ui_text = {}, clicks = {} }
 players = {
-  [0] = { sleep_time = 0, damage_sleep = 0, pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
-  [1] = { sleep_time = 0, damage_sleep = 0, pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
+  [0] = { hit_stop = 0, sleep_time = 0, damage_sleep = 0, pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
+  [1] = { hit_stop = 0, sleep_time = 0, damage_sleep = 0, pl_sw_now = 0, vital_new = 1000, vital_max = 1000, guard_time = 0, damage_time = 0, combo_dm_air = 0 },
 }
 battle = {
   Round = { RoundNo = 1 }, Game = { stage_timer = 0 },
@@ -812,23 +812,23 @@ class GlueWithFakeREFramework(unittest.TestCase):
 
     def test_slowmo_slows_then_restores_when_enabled(self):
         lua = self.boot("sf6_tekken_mode.lua")
-        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'global_speed'")
         self._arm_smash_and_land(lua)
         speeds = list(lua.eval("fake.speeds").values())
-        self.assertEqual(speeds, [0.35])
+        self.assertEqual(speeds, [0.5])
         for n in range(6, 6 + 50):
             lua.execute(f"battle.Game.stage_timer = {n}")
             self.frame(lua)
         speeds = list(lua.eval("fake.speeds").values())
-        self.assertEqual(speeds, [0.35, 1.0])  # speed handed back after the effect
+        self.assertEqual(speeds, [0.5, 1.0])  # speed handed back after the effect
 
     def test_slowmo_restores_if_switched_off_midway(self):
         lua = self.boot("sf6_tekken_mode.lua")
-        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'global_speed'")
         self._arm_smash_and_land(lua)
         lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = false; battle.Game.stage_timer = 9")
         self.frame(lua)
-        self.assertEqual(list(lua.eval("fake.speeds").values()), [0.35, 1.0])
+        self.assertEqual(list(lua.eval("fake.speeds").values()), [0.5, 1.0])
 
     def test_script_reset_restores_normal_speed(self):
         lua = self.boot("sf6_tekken_mode.lua")
@@ -837,13 +837,14 @@ class GlueWithFakeREFramework(unittest.TestCase):
 
     def test_refused_slowmo_turns_itself_off_and_says_why(self):
         lua = self.boot("sf6_tekken_mode.lua")
-        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; fake.speed_error = true")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'global_speed'; fake.speed_error = true")
         self._arm_smash_and_land(lua)  # must not raise
         self.assertFalse(lua.eval("SF6_TEKKEN.MECH.slowmo_fx.enabled"))
         self.assertIn("Slow-motion error: ", self._ui(lua))
 
     def test_hit_freeze_candidates_show_live_and_missing_fields_say_n_a(self):
         lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("players[0].hit_stop = nil; players[1].hit_stop = nil")
         self.frame(lua)
         lua.execute("players[1].sleep_time = 7; battle.Game.stage_timer = 1")
         self.frame(lua)
@@ -863,7 +864,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua = self.boot("sf6_tekken_mode.lua")
         lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'scene_time_scale'")
         self._run_effect(lua)
-        self.assertEqual(list(lua.eval("fake.scale_calls").values()), [0.35, 1.0])
+        self.assertEqual(list(lua.eval("fake.scale_calls").values()), [0.5, 1.0])
         # restoring also sends "normal speed" to the other methods, so nothing can be left slowed
         self.assertEqual(list(lua.eval("fake.speeds").values()), [1.0])
 
@@ -872,7 +873,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'max_fps'")
         self._run_effect(lua)
         calls = list(lua.eval("fake.fps_calls").values())
-        self.assertAlmostEqual(calls[0], 21.0)  # 35% of 60
+        self.assertAlmostEqual(calls[0], 30.0)  # 50% of 60
         self.assertEqual(calls[1], 60)  # the original cap, not a guess
 
     def test_max_fps_with_no_cap_uses_sixty_as_the_base_and_restores_no_cap(self):
@@ -880,7 +881,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua.execute("fake.fps = 0; SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'max_fps'")
         self._run_effect(lua)
         calls = list(lua.eval("fake.fps_calls").values())
-        self.assertAlmostEqual(calls[0], 21.0)
+        self.assertAlmostEqual(calls[0], 30.0)
         self.assertEqual(calls[1], 0)
 
     def test_max_fps_that_cannot_be_read_refuses_instead_of_guessing(self):
@@ -899,9 +900,45 @@ class GlueWithFakeREFramework(unittest.TestCase):
 
     def test_panel_buttons_switch_the_slowmo_method(self):
         lua = self.boot("sf6_tekken_mode.lua")
-        self.assertIn("Slow-motion method: global_speed", self._ui(lua))
+        self.assertIn("Slow-motion method: max_fps", self._ui(lua))
         lua.execute("fake.press = 'use method: scene_time_scale'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")
         self.assertIn("Slow-motion method: scene_time_scale", self._ui(lua))
+
+    def test_hit_freeze_boost_is_off_by_default(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        self.assertEqual((lua.eval("players[0].hit_stop"), lua.eval("players[1].hit_stop")), (0, 0))
+
+    def test_hit_freeze_boost_adds_frames_to_both_fighters_on_a_hit(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.hitstop_boost.enabled = true")
+        self.frame(lua)
+        lua.execute("players[0].hit_stop = 4; players[1].hit_stop = 4; players[1].vital_new = 900; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        self.assertEqual((lua.eval("players[0].hit_stop"), lua.eval("players[1].hit_stop")), (7, 7))  # +3
+        self.assertIn("Hit freeze boosts applied: 1", self._ui(lua))
+
+    def test_big_boost_on_a_smash(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.hitstop_boost.enabled = true")
+        self._arm_smash_and_land(lua)
+        self.assertEqual(lua.eval("players[1].hit_stop"), 10)
+
+    def test_refused_hit_freeze_write_turns_the_boost_off_and_says_so(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.hitstop_boost.enabled = true")
+        lua.execute("""
+            local real = players[1]
+            players[1] = setmetatable({}, { __index = real, __newindex = function(t, k, v)
+                if k == "hit_stop" then error("read-only field") end rawset(real, k, v) end })
+        """)
+        self.frame(lua)
+        lua.execute("players[1].vital_new = 900; battle.Game.stage_timer = 1")
+        self.frame(lua)  # must not raise
+        self.assertFalse(lua.eval("SF6_TEKKEN.MECH.hitstop_boost.enabled"))
+        self.assertIn("Hit freeze error: ", self._ui(lua))
 
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")
@@ -932,11 +969,11 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.assertTrue(by_id["global_speed"]["ok"])
         self.assertTrue(by_id["scene_time_scale"]["ok"])
         self.assertTrue(by_id["max_fps"]["ok"])
-        self.assertFalse(by_id["hit_stop"]["ok"])  # the fake fighter has no hit_stop field
+        self.assertTrue(by_id["hit_stop"]["ok"])
         self.assertTrue(by_id["sleep_time"]["ok"])
 
     def run_write_test(self, lua, frames=125):
-        lua.execute("fake.press = 'Run write test (takes 1 health point from P1)'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")
+        lua.execute("fake.press = 'Run write test (adds 1 to a P1 value)'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")
         for _ in range(frames):
             self.frame(lua)
         return lua.eval('fake.saved["sf6_tekken/write_test_report.json"]')
@@ -945,20 +982,20 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua = self.boot("sf6_tekken_probe.lua")
         report = self.run_write_test(lua)
         self.assertIsNotNone(report)
-        res = list(report.results.values())
-        self.assertEqual([r["id"] for r in res], ["hp_now"])  # only the writable hook
-        r = res[0]
+        res = {r["id"]: r for r in report.results.values()}
+        self.assertEqual(sorted(res), ["hit_stop", "hp_now"])  # only the writable hooks
+        r = res["hp_now"]
         self.assertTrue(r["write_ok"])
         self.assertEqual((r["before"], r["after_write"], r["after_1_frame"], r["after_30_frames"], r["after_120_frames"]),
-                         (1000, 999, 999, 999, 999))
+                         (1000, 1001, 1001, 1001, 1001))  # +1, never negative
 
     def test_write_test_reports_a_reverted_write(self):
         lua = self.boot("sf6_tekken_probe.lua")
         # the game puts the old value back on the next frame
         lua.execute("table.insert(fake.frame_cbs, 1, function() players[0].vital_new = 1000 end)")
         report = self.run_write_test(lua)
-        r = list(report.results.values())[0]
-        self.assertEqual(r["after_write"], 999)
+        r = {r["id"]: r for r in report.results.values()}["hp_now"]
+        self.assertEqual(r["after_write"], 1001)
         self.assertEqual(r["after_1_frame"], 1000)
         self.assertEqual(r["after_120_frames"], 1000)
 
@@ -969,7 +1006,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
             players[0] = setmetatable({}, { __index = real, __newindex = function() error("read-only field") end })
         """)
         report = self.run_write_test(lua)
-        r = list(report.results.values())[0]
+        r = {r["id"]: r for r in report.results.values()}["hp_now"]
         self.assertFalse(r["write_ok"])
         self.assertIn("read-only", r["error"])
 

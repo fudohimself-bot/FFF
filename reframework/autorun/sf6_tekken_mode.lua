@@ -26,6 +26,8 @@ local ROWS = {
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
       ["fx_method"] = "n/a",
+      ["boost_frames"] = "n/a",
+      ["big_boost_frames"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -60,6 +62,8 @@ local ROWS = {
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
       ["fx_method"] = "n/a",
+      ["boost_frames"] = "n/a",
+      ["big_boost_frames"] = "n/a",
       ["key_p1"] = 112,
       ["key_p2"] = 113,
       ["uses_hooks"] = {
@@ -98,6 +102,8 @@ local ROWS = {
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
       ["fx_method"] = "n/a",
+      ["boost_frames"] = "n/a",
+      ["big_boost_frames"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -133,6 +139,8 @@ local ROWS = {
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
       ["fx_method"] = "n/a",
+      ["boost_frames"] = "n/a",
+      ["big_boost_frames"] = "n/a",
       ["key_p1"] = 114,
       ["key_p2"] = 115,
       ["uses_hooks"] = {
@@ -165,9 +173,11 @@ local ROWS = {
       ["heat_start_heals_pct_of_pool"] = "n/a",
       ["armed_ticks"] = "n/a",
       ["bonus_pct_of_max"] = "n/a",
-      ["fx_speed_scale"] = 0.35,
-      ["fx_frames"] = 45,
-      ["fx_method"] = "global_speed",
+      ["fx_speed_scale"] = 0.5,
+      ["fx_frames"] = 30,
+      ["fx_method"] = "max_fps",
+      ["boost_frames"] = "n/a",
+      ["big_boost_frames"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -177,7 +187,40 @@ local ROWS = {
       },
       ["status"] = "implemented",
       ["verified"] = false,
-      ["note"] = "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call. Test 2026-10-07: the global speed method did not visibly slow the game, so two other methods (scene time scale, lower frame cap) can be selected in the panel and tried."
+      ["note"] = "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 50% for about half a second by lowering the frame cap (so it looks choppy). Off by default. Test 2026-10-07: global speed and scene time scale did not visibly slow SF6; the frame cap method did. Speed and length can be changed live in the panel."
+    },
+    {
+      ["id"] = "hitstop_boost",
+      ["enabled"] = false,
+      ["kind"] = "hitstop_boost",
+      ["trigger"] = "any_hit_landed",
+      ["hp_threshold_pct"] = "n/a",
+      ["damage_mult"] = "n/a",
+      ["duration_ticks"] = "n/a",
+      ["cooldown_ticks"] = "n/a",
+      ["chip_pct_of_max"] = "n/a",
+      ["uses_per_round"] = "n/a",
+      ["pause_while_opponent_in_hitstun"] = "n/a",
+      ["chip_can_ko"] = "n/a",
+      ["recover_pct_of_max_per_landed_attack"] = "n/a",
+      ["chip_taken_reduction_pct"] = "n/a",
+      ["hit_trims_recoverable_pct"] = "n/a",
+      ["heat_start_heals_pct_of_pool"] = "n/a",
+      ["armed_ticks"] = "n/a",
+      ["bonus_pct_of_max"] = "n/a",
+      ["fx_speed_scale"] = "n/a",
+      ["fx_frames"] = "n/a",
+      ["fx_method"] = "n/a",
+      ["boost_frames"] = 3,
+      ["big_boost_frames"] = 10,
+      ["key_p1"] = "n/a",
+      ["key_p2"] = "n/a",
+      ["uses_hooks"] = {
+        "hit_stop"
+      },
+      ["status"] = "implemented",
+      ["verified"] = false,
+      ["note"] = "Weightier hits: when a hit lands, add 3 frames to the game's hit freeze counter on both fighters (10 frames when a Heat Smash or Rage Art lands). Off by default. Whether hit_stop is the real hit freeze and whether the game honours the write is untested."
     }
   },
   ["hooks"] = {
@@ -307,9 +350,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Tell when a fighter is in hitstun, so the opponent's Heat timer pauses while they are being hit (Tekken 8: the Heat timer stops while the opponent is hit)",
       ["source"] = "Fighter field list from the probe; SF6_replay_capture reads it as hitstun",
-      ["read_verified"] = false,
+      ["read_verified"] = true,
       ["write_verified"] = "n/a",
-      ["evidence"] = "Field name seen in the probe's field list; its value during hitstun has not been seen yet."
+      ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest. Its value during hitstun has not been seen yet."
     },
     {
       ["id"] = "button_state",
@@ -324,9 +367,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "The game's own held-button bits for each fighter, so Heat can later be started from a gamepad button combo (Tekken's Heat Burst is 2+3) instead of only a keyboard key",
       ["source"] = "Fighter field list from the probe; the meaning of the bits is not known yet",
-      ["read_verified"] = false,
+      ["read_verified"] = true,
       ["write_verified"] = "n/a",
-      ["evidence"] = "Field name seen in the probe's field list. Which bit is which button is unknown: the panel shows the live value so the bits can be decoded."
+      ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters with no buttons held. Which bit is which button is unknown."
     },
     {
       ["id"] = "global_speed",
@@ -341,7 +384,7 @@ local ROWS = {
       ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
       ["read_verified"] = "n/a",
       ["write_verified"] = false,
-      ["evidence"] = "User test 2026-10-07: pressing the panel's test button did not visibly slow the game (whether the call errored is unknown). Either SF6 ignores global speed or the call was refused."
+      ["evidence"] = "Probe 2026-10-07: the call is available. User test: it did not visibly slow the game."
     },
     {
       ["id"] = "sleep_time",
@@ -356,9 +399,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Research: a candidate for the game's hit freeze, to make hits feel weightier",
       ["source"] = "Fighter field list from the probe; meaning unknown",
-      ["read_verified"] = false,
+      ["read_verified"] = true,
       ["write_verified"] = "n/a",
-      ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+      ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest. Behaviour during hits not seen."
     },
     {
       ["id"] = "damage_sleep",
@@ -373,9 +416,9 @@ local ROWS = {
       ["value_type"] = "int",
       ["purpose"] = "Research: another candidate for the game's hit freeze",
       ["source"] = "Fighter field list from the probe; meaning unknown",
-      ["read_verified"] = false,
+      ["read_verified"] = true,
       ["write_verified"] = "n/a",
-      ["evidence"] = "Field name seen in the probe's field list; value during a hit not seen yet."
+      ["evidence"] = "Probe 2026-10-07: P1 read 0, P2 read 3 while a hit was fresh, so it moves around hits. Meaning (hit freeze?) not confirmed."
     },
     {
       ["id"] = "hit_stop",
@@ -386,13 +429,13 @@ local ROWS = {
         "[i]",
         "hit_stop"
       },
-      ["access"] = "r",
+      ["access"] = "rw",
       ["value_type"] = "int",
-      ["purpose"] = "Research: the hit freeze field the community replay script reads; it was NOT in the fighter field list, so it may not exist on this object",
+      ["purpose"] = "The game's hit freeze counter (candidate): read to see it, and add a few frames to it on a landed hit so hits feel weightier",
       ["source"] = "SF6_replay_capture reads cPlayer[i].hit_stop",
-      ["read_verified"] = false,
-      ["write_verified"] = "n/a",
-      ["evidence"] = "Not in the probe's field list for the fighter object. The probe will say whether reading it works."
+      ["read_verified"] = true,
+      ["write_verified"] = false,
+      ["evidence"] = "Probe 2026-10-07: reads 0 for both fighters at rest, although the name was not in the fighter's field list (probably on a parent object). Whether it is the hit freeze, and whether writing it works, is untested."
     },
     {
       ["id"] = "scene_time_scale",
@@ -408,7 +451,7 @@ local ROWS = {
       ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
       ["read_verified"] = "n/a",
       ["write_verified"] = false,
-      ["evidence"] = "None yet."
+      ["evidence"] = "Probe 2026-10-07: the call is available. User test: it did not visibly slow the game."
     },
     {
       ["id"] = "max_fps",
@@ -422,8 +465,8 @@ local ROWS = {
       ["purpose"] = "Third way to slow the game: lower the frame cap, which slows anything that advances one step per frame; the original cap is restored afterwards",
       ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
       ["read_verified"] = "n/a",
-      ["write_verified"] = false,
-      ["evidence"] = "None yet."
+      ["write_verified"] = true,
+      ["evidence"] = "Probe 2026-10-07: reading the cap works. User test: this is the only method that visibly slowed the game, and the user was unsure how it felt (a lower frame rate looks choppy)."
     }
   }
 }
@@ -445,7 +488,7 @@ local function new_player()
 end
 
 function Engine.new_state()
-    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, smash_count = 0, art_count = 0, fx = nil, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
+    return { round = nil, last_timer = nil, tick = 0, chip_count = 0, smash_count = 0, art_count = 0, fx = nil, freeze = nil, last_event = "none yet", p = { [0] = new_player(), [1] = new_player() } }
 end
 
 local function enabled(id)
@@ -624,6 +667,9 @@ function Engine.step(st, snap)
         if last ~= nil and hp[v] < last then
             local drop = last - hp[v]
             landed[a] = true
+            if enabled("hitstop_boost") then
+                st.freeze = math.max(st.freeze or 0, MECH.hitstop_boost.boost_frames)
+            end
             local mult = 1.0
             if enabled("rage") and st.p[a].rage then mult = mult * MECH.rage.damage_mult end
             if enabled("heat") and Engine.heat_active(st, a) then mult = mult * MECH.heat.damage_mult end
@@ -650,6 +696,7 @@ function Engine.step(st, snap)
                 st.p[a].heat_left = 0
                 st.smash_count = st.smash_count + 1
                 st.last_event = string.format("P%d Heat Smash LANDED for %d extra, Heat spent", a + 1, extra)
+                if enabled("hitstop_boost") then st.freeze = math.max(st.freeze or 0, MECH.hitstop_boost.big_boost_frames) end
                 if enabled("slowmo_fx") then st.fx = { scale = MECH.slowmo_fx.fx_speed_scale, frames = MECH.slowmo_fx.fx_frames } end
             end
             if enabled("rage_art") and st.p[a].art_left > 0 and hp[v] > 0 then
@@ -667,6 +714,7 @@ function Engine.step(st, snap)
                 st.p[a].rage_spent = true
                 st.art_count = st.art_count + 1
                 st.last_event = string.format("P%d Rage Art LANDED for %d extra, Rage spent", a + 1, extra)
+                if enabled("hitstop_boost") then st.freeze = math.max(st.freeze or 0, MECH.hitstop_boost.big_boost_frames) end
                 if enabled("slowmo_fx") then st.fx = { scale = MECH.slowmo_fx.fx_speed_scale, frames = MECH.slowmo_fx.fx_frames } end
             end
         end
@@ -742,7 +790,7 @@ if re ~= nil and sdk ~= nil then
     local state = Engine.new_state()
     local last_error = nil
     local last_status = "waiting for a match"
-    local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 } }
+    local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 }, freeze_boosts = 0, freeze_error = nil }
     local hud = { show = true, error = nil }
     local fx = { left = 0, error = nil, calls = 0, orig_fps = nil }
 
@@ -924,6 +972,20 @@ if re ~= nil and sdk ~= nil then
             return
         end
         update_watch(players)
+        if state.freeze ~= nil then
+            local n = state.freeze
+            state.freeze = nil
+            if MECH.hitstop_boost ~= nil and MECH.hitstop_boost.enabled then
+                for i = 0, 1 do
+                    local okf, errf = pcall(function() players[i].hit_stop = num(players[i].hit_stop) + n end)
+                    if not okf then
+                        stats.freeze_error = tostring(errf)
+                        MECH.hitstop_boost.enabled = false  -- the game refused it: stop trying
+                    end
+                end
+                if stats.freeze_error == nil then stats.freeze_boosts = stats.freeze_boosts + 1 end
+            end
+        end
         -- Slow-motion for big moments: start when the rules ask for it, always hand the speed back afterwards.
         if state.fx ~= nil then
             if MECH.slowmo_fx ~= nil and MECH.slowmo_fx.enabled then start_fx(state.fx.scale, state.fx.frames) end
@@ -973,7 +1035,7 @@ if re ~= nil and sdk ~= nil then
             imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
             imgui.text(string.format("Chip hits: %d   block timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 state.chip_count, stats.guard_now[0], stats.guard_now[1], stats.guard_max[0], stats.guard_max[1]))
-            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art", "slowmo_fx" }) do
+            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art", "slowmo_fx", "hitstop_boost" }) do
                 if MECH[id] ~= nil then
                     local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                     if changed then MECH[id].enabled = value end
@@ -1009,6 +1071,24 @@ if re ~= nil and sdk ~= nil then
                         fx.error = nil
                     end
                 end
+            end
+            if MECH.slowmo_fx ~= nil then
+                pcall(function()
+                    local c1, v1 = imgui.slider_float("slow-motion speed (1.0 = normal)", MECH.slowmo_fx.fx_speed_scale, 0.1, 1.0)
+                    if c1 then MECH.slowmo_fx.fx_speed_scale = v1 end
+                    local c2, v2 = imgui.slider_int("slow-motion length (frames)", MECH.slowmo_fx.fx_frames, 5, 120)
+                    if c2 then MECH.slowmo_fx.fx_frames = v2 end
+                end)
+            end
+            if MECH.hitstop_boost ~= nil then
+                pcall(function()
+                    local c3, v3 = imgui.slider_int("hit freeze boost (frames)", MECH.hitstop_boost.boost_frames, 0, 20)
+                    if c3 then MECH.hitstop_boost.boost_frames = v3 end
+                    local c4, v4 = imgui.slider_int("big hit freeze boost (frames)", MECH.hitstop_boost.big_boost_frames, 0, 40)
+                    if c4 then MECH.hitstop_boost.big_boost_frames = v4 end
+                end)
+                imgui.text(string.format("Hit freeze boosts applied: %d", stats.freeze_boosts))
+                if stats.freeze_error then imgui.text("Hit freeze error: " .. stats.freeze_error) end
             end
             if fx.error then imgui.text("Slow-motion error: " .. fx.error) end
             imgui.text(string.format("Slow-motion calls made: %d", fx.calls))

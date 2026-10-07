@@ -1,6 +1,6 @@
 {
   "sheet": "mechanics",
-  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here). Heat Smash and Rage Art are stand-ins: they are damage bonuses on your next landed hit, armed with a key, not real moves. bonus_pct_of_max, armed_ticks and heat_start_heals_pct_of_pool are my estimates for fun, not Tekken's numbers. slowmo_fx slows the whole game for fx_frames screen frames at fx_speed_scale (1.0 = normal) when a Heat Smash or Rage Art lands. It is an experiment: it is off until the user tests it, and it turns itself off if the game refuses it. fx_method names which hook slows the game: global_speed, scene_time_scale or max_fps.",
+  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here). Heat Smash and Rage Art are stand-ins: they are damage bonuses on your next landed hit, armed with a key, not real moves. bonus_pct_of_max, armed_ticks and heat_start_heals_pct_of_pool are my estimates for fun, not Tekken's numbers. slowmo_fx slows the whole game for fx_frames screen frames at fx_speed_scale (1.0 = normal) when a Heat Smash or Rage Art lands. It is an experiment: it is off until the user tests it, and it turns itself off if the game refuses it. fx_method names which hook slows the game: global_speed, scene_time_scale or max_fps. hitstop_boost adds boost_frames to the hit freeze counter when a hit lands (big_boost_frames for a Heat Smash or Rage Art).",
   "columns": [
     "id",
     "enabled",
@@ -23,6 +23,8 @@
     "fx_speed_scale",
     "fx_frames",
     "fx_method",
+    "boost_frames",
+    "big_boost_frames",
     "key_p1",
     "key_p2",
     "uses_hooks",
@@ -53,6 +55,8 @@
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
       "fx_method": "n/a",
+      "boost_frames": "n/a",
+      "big_boost_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -87,6 +91,8 @@
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
       "fx_method": "n/a",
+      "boost_frames": "n/a",
+      "big_boost_frames": "n/a",
       "key_p1": 112,
       "key_p2": 113,
       "uses_hooks": [
@@ -125,6 +131,8 @@
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
       "fx_method": "n/a",
+      "boost_frames": "n/a",
+      "big_boost_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -158,6 +166,8 @@
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
       "fx_method": "n/a",
+      "boost_frames": "n/a",
+      "big_boost_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -193,6 +203,8 @@
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
       "fx_method": "n/a",
+      "boost_frames": "n/a",
+      "big_boost_frames": "n/a",
       "key_p1": 114,
       "key_p2": 115,
       "uses_hooks": [
@@ -225,9 +237,11 @@
       "heat_start_heals_pct_of_pool": "n/a",
       "armed_ticks": "n/a",
       "bonus_pct_of_max": "n/a",
-      "fx_speed_scale": 0.35,
-      "fx_frames": 45,
-      "fx_method": "global_speed",
+      "fx_speed_scale": 0.5,
+      "fx_frames": 30,
+      "fx_method": "max_fps",
+      "boost_frames": "n/a",
+      "big_boost_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -237,7 +251,7 @@
       ],
       "status": "implemented",
       "verified": false,
-      "note": "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call. Test 2026-10-07: the global speed method did not visibly slow the game, so two other methods (scene time scale, lower frame cap) can be selected in the panel and tried."
+      "note": "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 50% for about half a second by lowering the frame cap (so it looks choppy). Off by default. Test 2026-10-07: global speed and scene time scale did not visibly slow SF6; the frame cap method did. Speed and length can be changed live in the panel."
     },
     {
       "id": "hitstop_research",
@@ -261,6 +275,8 @@
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
       "fx_method": "n/a",
+      "boost_frames": "n/a",
+      "big_boost_frames": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -271,6 +287,39 @@
       "status": "research",
       "verified": false,
       "note": "Weightier hits: first find out which field is the game's hit freeze and whether it can be written. The panel shows the live values of all three candidates."
+    },
+    {
+      "id": "hitstop_boost",
+      "enabled": false,
+      "kind": "hitstop_boost",
+      "trigger": "any_hit_landed",
+      "hp_threshold_pct": "n/a",
+      "damage_mult": "n/a",
+      "duration_ticks": "n/a",
+      "cooldown_ticks": "n/a",
+      "chip_pct_of_max": "n/a",
+      "uses_per_round": "n/a",
+      "pause_while_opponent_in_hitstun": "n/a",
+      "chip_can_ko": "n/a",
+      "recover_pct_of_max_per_landed_attack": "n/a",
+      "chip_taken_reduction_pct": "n/a",
+      "hit_trims_recoverable_pct": "n/a",
+      "heat_start_heals_pct_of_pool": "n/a",
+      "armed_ticks": "n/a",
+      "bonus_pct_of_max": "n/a",
+      "fx_speed_scale": "n/a",
+      "fx_frames": "n/a",
+      "fx_method": "n/a",
+      "boost_frames": 3,
+      "big_boost_frames": 10,
+      "key_p1": "n/a",
+      "key_p2": "n/a",
+      "uses_hooks": [
+        "hit_stop"
+      ],
+      "status": "implemented",
+      "verified": false,
+      "note": "Weightier hits: when a hit lands, add 3 frames to the game's hit freeze counter on both fighters (10 frames when a Heat Smash or Rage Art lands). Off by default. Whether hit_stop is the real hit freeze and whether the game honours the write is untested."
     }
   ]
 }

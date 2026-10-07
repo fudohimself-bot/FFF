@@ -2,7 +2,7 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: Rage, Heat, Heat Smash and Rage Art work and feel good in offline play (user report, 2026-10-07); the impact slow-motion and the hit-freeze readouts are new and untested.** In real offline matches every field the mod needs read correctly and health writes were kept. The rules are tested against a fake match and a fake REFramework (95 tests).
+**Status: Rage, Heat, Heat Smash and Rage Art work and feel good in offline play (user report, 2026-10-07); the impact slow-motion and the hit-freeze readouts are new and untested.** In real offline matches every field the mod needs read correctly and health writes were kept. The rules are tested against a fake match and a fake REFramework (99 tests).
 
 ## What it adds
 
@@ -15,8 +15,8 @@ Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (l
 | Heat Smash (stand-in) | Press the Heat key again while in Heat to arm it for 2 seconds. Your next hit deals 15% of max health extra and uses up your Heat. If it doesn't land in time, the Heat is spent anyway. A block doesn't use it up | built, untested in game. Not the real move: no animation or armor |
 | Rage Art (stand-in) | While in Rage, press **F3** (P2 **F4**), once per round. Your next hit within 2 seconds deals 18% of max health extra, removes the opponent's recoverable health, wins back some of yours and ends your Rage. If it misses, Rage still ends | built, untested in game. Not the real move: no cinematic |
 | On-screen readout | Heat bar, Rage and recoverable health for both fighters, from the mod itself | built, untested in game |
-| Impact slow-motion | When a Heat Smash or Rage Art lands, the game slows to 35% for about 0.75 seconds | experimental, **off by default**. The first method (global speed) did not visibly slow the game in testing, so the panel now offers two more methods (scene time scale, lower frame cap). Try each with the test button, then tick the box |
-| Hit freeze (weightier hits) | Find which field is the game's hit freeze and whether it can be written | research: the panel shows three candidates live |
+| Impact slow-motion | When a Heat Smash or Rage Art lands, the game slows to 50% for about half a second | experimental, **off by default**. Only the frame cap method visibly slowed SF6 in testing (it looks choppy, since it lowers the frame rate). Speed and length can be changed live in the panel |
+| Hit freeze boost (weightier hits) | When a hit lands, adds 3 frames to the game's `hit_stop` counter on both fighters (10 when a Heat Smash or Rage Art lands) | experimental, **off by default**. Whether `hit_stop` is the real hit freeze and whether the game honours the write is untested. Sizes adjustable live in the panel |
 | Juggle scaling | Longer air combos | research only, not built |
 
 **Not possible in this mod** (they need new moves, animations or movement, not state changes): the real Heat Smash and Rage Art moves, Heat Dash, Heat Burst as a 2+3 input, Heat Engager moves, sidesteps, Tekken's four-button layout and a Tekken move list for any SF6 fighter. **Possible but needs more research:** wall carry and bounce tuning, and starting Heat from a gamepad button combo (the panel shows the game's raw held-button bits so they can be decoded).

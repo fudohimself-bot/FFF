@@ -25,6 +25,7 @@ local ROWS = {
       ["bonus_pct_of_max"] = "n/a",
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
+      ["fx_method"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -58,6 +59,7 @@ local ROWS = {
       ["bonus_pct_of_max"] = "n/a",
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
+      ["fx_method"] = "n/a",
       ["key_p1"] = 112,
       ["key_p2"] = 113,
       ["uses_hooks"] = {
@@ -95,6 +97,7 @@ local ROWS = {
       ["bonus_pct_of_max"] = 15,
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
+      ["fx_method"] = "n/a",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
@@ -129,6 +132,7 @@ local ROWS = {
       ["bonus_pct_of_max"] = 18,
       ["fx_speed_scale"] = "n/a",
       ["fx_frames"] = "n/a",
+      ["fx_method"] = "n/a",
       ["key_p1"] = 114,
       ["key_p2"] = 115,
       ["uses_hooks"] = {
@@ -163,14 +167,17 @@ local ROWS = {
       ["bonus_pct_of_max"] = "n/a",
       ["fx_speed_scale"] = 0.35,
       ["fx_frames"] = 45,
+      ["fx_method"] = "global_speed",
       ["key_p1"] = "n/a",
       ["key_p2"] = "n/a",
       ["uses_hooks"] = {
-        "global_speed"
+        "global_speed",
+        "scene_time_scale",
+        "max_fps"
       },
       ["status"] = "implemented",
       ["verified"] = false,
-      ["note"] = "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call."
+      ["note"] = "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call. Test 2026-10-07: the global speed method did not visibly slow the game, so two other methods (scene time scale, lower frame cap) can be selected in the panel and tried."
     }
   },
   ["hooks"] = {
@@ -334,7 +341,7 @@ local ROWS = {
       ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
       ["read_verified"] = "n/a",
       ["write_verified"] = false,
-      ["evidence"] = "None yet. The panel has a test button; the probe checks the engine type exists."
+      ["evidence"] = "User test 2026-10-07: pressing the panel's test button did not visibly slow the game (whether the call errored is unknown). Either SF6 ignores global speed or the call was refused."
     },
     {
       ["id"] = "sleep_time",
@@ -386,6 +393,37 @@ local ROWS = {
       ["read_verified"] = false,
       ["write_verified"] = "n/a",
       ["evidence"] = "Not in the probe's field list for the fighter object. The probe will say whether reading it works."
+    },
+    {
+      ["id"] = "scene_time_scale",
+      ["kind"] = "api",
+      ["path_steps"] = {
+        "via.SceneManager",
+        "get_CurrentScene",
+        "set_TimeScale"
+      },
+      ["access"] = "w",
+      ["value_type"] = "float",
+      ["purpose"] = "Second way to slow the game: the current scene's time scale",
+      ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
+      ["read_verified"] = "n/a",
+      ["write_verified"] = false,
+      ["evidence"] = "None yet."
+    },
+    {
+      ["id"] = "max_fps",
+      ["kind"] = "api",
+      ["path_steps"] = {
+        "via.Application",
+        "set_MaxFps"
+      },
+      ["access"] = "w",
+      ["value_type"] = "float",
+      ["purpose"] = "Third way to slow the game: lower the frame cap, which slows anything that advances one step per frame; the original cap is restored afterwards",
+      ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
+      ["read_verified"] = "n/a",
+      ["write_verified"] = false,
+      ["evidence"] = "None yet."
     }
   }
 }
@@ -706,7 +744,7 @@ if re ~= nil and sdk ~= nil then
     local last_status = "waiting for a match"
     local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 } }
     local hud = { show = true, error = nil }
-    local fx = { left = 0, error = nil, calls = 0 }
+    local fx = { left = 0, error = nil, calls = 0, orig_fps = nil }
 
     -- Research readouts: live values of the fields that might be the game's hit freeze.
     local WATCH = {}
@@ -735,30 +773,74 @@ if re ~= nil and sdk ~= nil then
         end
     end
 
-    -- Global game speed (1.0 = normal). Returns true if the engine accepted the call.
-    local function set_speed(v)
+    -- Ways to slow the game. Each has apply(scale) (1.0 = normal) and restore(); either may throw if the game refuses.
+    local function app_call(method, ...)
         local app = sdk.get_native_singleton("via.Application")
         local t = sdk.find_type_definition("via.Application")
-        sdk.call_native_func(app, t, "set_GlobalSpeed", v)
-        fx.calls = fx.calls + 1
+        return sdk.call_native_func(app, t, method, ...)
     end
 
+    local function current_scene()
+        local sm = sdk.get_native_singleton("via.SceneManager")
+        local t = sdk.find_type_definition("via.SceneManager")
+        local scene = sdk.call_native_func(sm, t, "get_CurrentScene")
+        if scene == nil then error("no current scene") end
+        return scene
+    end
+
+    local SPEED = {
+        global_speed = {
+            apply = function(scale) app_call("set_GlobalSpeed", scale) end,
+            restore = function() app_call("set_GlobalSpeed", 1.0) end,
+        },
+        scene_time_scale = {
+            apply = function(scale) current_scene():call("set_TimeScale", scale) end,
+            restore = function() current_scene():call("set_TimeScale", 1.0) end,
+        },
+        max_fps = {
+            apply = function(scale)
+                if fx.orig_fps == nil then
+                    local cur = tonumber(app_call("get_MaxFps"))
+                    if cur == nil then error("could not read the current frame cap") end
+                    fx.orig_fps = cur
+                end
+                local base = fx.orig_fps > 0 and fx.orig_fps or 60
+                app_call("set_MaxFps", math.max(5, base * scale))
+            end,
+            restore = function()
+                if fx.orig_fps ~= nil then
+                    local o = fx.orig_fps
+                    fx.orig_fps = nil
+                    app_call("set_MaxFps", o)
+                end
+            end,
+        },
+    }
+    local METHOD_ORDER = { "global_speed", "scene_time_scale", "max_fps" }
+
     local function restore_speed()
-        local ok = pcall(set_speed, 1.0)
+        local all_ok = true
+        for _, name in ipairs(METHOD_ORDER) do
+            local ok = pcall(SPEED[name].restore)
+            if not ok and name ~= "max_fps" then all_ok = false end
+        end
         fx.left = 0
-        return ok
+        return all_ok
     end
 
     local function start_fx(scale, frames)
-        local ok, err = pcall(set_speed, scale)
+        local method = (MECH.slowmo_fx and MECH.slowmo_fx.fx_method) or "global_speed"
+        local impl = SPEED[method]
+        local ok, err = pcall(impl.apply, scale)
+        fx.calls = fx.calls + 1
         if ok then
             fx.left = frames
             fx.error = nil
         else
-            fx.error = tostring(err)
+            fx.error = method .. ": " .. tostring(err)
             fx.left = 0
             if MECH.slowmo_fx then MECH.slowmo_fx.enabled = false end  -- the game refused it: stop trying
-            pcall(set_speed, 1.0)
+            restore_speed()
         end
     end
 
@@ -918,6 +1000,15 @@ if re ~= nil and sdk ~= nil then
             if imgui.button("arm P1 Rage Art (no key)") then Engine.arm_art(state, 0) end
             if MECH.slowmo_fx ~= nil and imgui.button("test slow-motion now (about 1 second)") then
                 start_fx(MECH.slowmo_fx.fx_speed_scale, MECH.slowmo_fx.fx_frames)
+            end
+            if MECH.slowmo_fx ~= nil then
+                imgui.text("Slow-motion method: " .. tostring(MECH.slowmo_fx.fx_method))
+                for _, name in ipairs(METHOD_ORDER) do
+                    if imgui.button("use method: " .. name) then
+                        MECH.slowmo_fx.fx_method = name
+                        fx.error = nil
+                    end
+                end
             end
             if fx.error then imgui.text("Slow-motion error: " .. fx.error) end
             imgui.text(string.format("Slow-motion calls made: %d", fx.calls))

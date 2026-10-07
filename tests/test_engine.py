@@ -606,17 +606,30 @@ re = {
   on_script_reset = function(cb) fake.reset_cb = cb end,
 }
 fake.speeds = {}
-fake.app = {}
-sdk_get_native = function(name) if fake.no_app then return nil end return fake.app end
+fake.scale_calls = {}
+fake.fps_calls = {}
+fake.fps = 60
+fake.scene = { call = function(self, name, v)
+  if fake.speed_error then error("call refused") end
+  assert(name == "set_TimeScale")
+  table.insert(fake.scale_calls, v)
+end }
+sdk_get_native = function(name)
+  if name == "via.Application" or name == "via.SceneManager" then return { name = name } end
+  return nil
+end
 sdk = {
   find_type_definition = function(name)
-    if name == "via.Application" then return { name = name } end
+    if name == "via.Application" or name == "via.SceneManager" then return { name = name } end
     if name ~= "gBattle" or fake.no_battle then return nil end
     return { get_field = function(self, f) return { get_data = function() return battle[f] end } end }
   end,
   get_native_singleton = function(name) return sdk_get_native(name) end,
   call_native_func = function(obj, t, method, value)
     if fake.speed_error then error("call refused") end
+    if method == "get_CurrentScene" then return fake.scene end
+    if method == "get_MaxFps" then return fake.fps end
+    if method == "set_MaxFps" then table.insert(fake.fps_calls, value); return end
     assert(method == "set_GlobalSpeed")
     table.insert(fake.speeds, value)
   end,
@@ -840,6 +853,56 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.assertIn("Hit-freeze candidate sleep_time: now P1 0 / P2 0, highest seen P1 0 / P2 7", ui)
         self.assertIn("Hit-freeze candidate hit_stop: now P1 n/a / P2 n/a", ui)  # the fake has no such field
 
+    def _run_effect(self, lua, extra_frames=50):
+        self._arm_smash_and_land(lua)
+        for n in range(6, 6 + extra_frames):
+            lua.execute(f"battle.Game.stage_timer = {n}")
+            self.frame(lua)
+
+    def test_scene_time_scale_method_slows_then_restores(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'scene_time_scale'")
+        self._run_effect(lua)
+        self.assertEqual(list(lua.eval("fake.scale_calls").values()), [0.35, 1.0])
+        # restoring also sends "normal speed" to the other methods, so nothing can be left slowed
+        self.assertEqual(list(lua.eval("fake.speeds").values()), [1.0])
+
+    def test_max_fps_method_lowers_the_cap_then_restores_the_original(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'max_fps'")
+        self._run_effect(lua)
+        calls = list(lua.eval("fake.fps_calls").values())
+        self.assertAlmostEqual(calls[0], 21.0)  # 35% of 60
+        self.assertEqual(calls[1], 60)  # the original cap, not a guess
+
+    def test_max_fps_with_no_cap_uses_sixty_as_the_base_and_restores_no_cap(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.fps = 0; SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'max_fps'")
+        self._run_effect(lua)
+        calls = list(lua.eval("fake.fps_calls").values())
+        self.assertAlmostEqual(calls[0], 21.0)
+        self.assertEqual(calls[1], 0)
+
+    def test_max_fps_that_cannot_be_read_refuses_instead_of_guessing(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.fps = nil; SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'max_fps'")
+        self._arm_smash_and_land(lua)
+        self.assertEqual(len(list(lua.eval("fake.fps_calls").values())), 0)
+        self.assertIn("Slow-motion error: max_fps: ", self._ui(lua))
+
+    def test_script_reset_puts_the_frame_cap_back(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.slowmo_fx.enabled = true; SF6_TEKKEN.MECH.slowmo_fx.fx_method = 'max_fps'")
+        self._arm_smash_and_land(lua)
+        lua.execute("fake.reset_cb()")
+        self.assertEqual(list(lua.eval("fake.fps_calls").values())[-1], 60)
+
+    def test_panel_buttons_switch_the_slowmo_method(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.assertIn("Slow-motion method: global_speed", self._ui(lua))
+        lua.execute("fake.press = 'use method: scene_time_scale'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.press = nil")
+        self.assertIn("Slow-motion method: scene_time_scale", self._ui(lua))
+
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")
         lua.execute("fake.no_battle = true")
@@ -867,6 +930,8 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.assertEqual(len(by_id["hp_now"]["reads"]), 2)
         self.assertTrue(by_id["key_state"]["ok"])
         self.assertTrue(by_id["global_speed"]["ok"])
+        self.assertTrue(by_id["scene_time_scale"]["ok"])
+        self.assertTrue(by_id["max_fps"]["ok"])
         self.assertFalse(by_id["hit_stop"]["ok"])  # the fake fighter has no hit_stop field
         self.assertTrue(by_id["sleep_time"]["ok"])
 

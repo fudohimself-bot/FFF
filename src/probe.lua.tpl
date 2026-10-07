@@ -14,6 +14,16 @@ if re ~= nil and sdk ~= nil then
         global_speed = function()
             return sdk.get_native_singleton("via.Application") ~= nil and sdk.find_type_definition("via.Application") ~= nil
         end,
+        max_fps = function()
+            local app = sdk.get_native_singleton("via.Application")
+            local t = sdk.find_type_definition("via.Application")
+            return app ~= nil and t ~= nil and tonumber(sdk.call_native_func(app, t, "get_MaxFps")) ~= nil
+        end,
+        scene_time_scale = function()
+            local sm = sdk.get_native_singleton("via.SceneManager")
+            local t = sdk.find_type_definition("via.SceneManager")
+            return sm ~= nil and t ~= nil and sdk.call_native_func(sm, t, "get_CurrentScene") ~= nil
+        end,
     }
 
     local function describe(v)

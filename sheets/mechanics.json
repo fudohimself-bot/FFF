@@ -1,6 +1,6 @@
 {
   "sheet": "mechanics",
-  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here). Heat Smash and Rage Art are stand-ins: they are damage bonuses on your next landed hit, armed with a key, not real moves. bonus_pct_of_max, armed_ticks and heat_start_heals_pct_of_pool are my estimates for fun, not Tekken's numbers. slowmo_fx slows the whole game for fx_frames screen frames at fx_speed_scale (1.0 = normal) when a Heat Smash or Rage Art lands. It is an experiment: it is off until the user tests it, and it turns itself off if the game refuses it.",
+  "about": "Tekken-style systems added to Street Fighter 6, offline only. One row per system. 'n/a' means the column does not apply to that row. Every cell must be filled. Heat follows Tekken 8: once per round, a 10 second timer that stops while the opponent is hit, no general damage bonus, and chip damage on block that cannot KO and that you win back by landing attacks. chip_pct_of_max and recover_pct_of_max_per_landed_attack are my estimates: Tekken's chip is 20% of the blocked attack's damage, which SF6 does not give us on a block yet. Rage follows Tekken 8 (season 3): active at 45 of 180 health (25%), +10% damage rounded down, and 70% less chip damage taken. A hit on a fighter who is not in Heat removes 30% of its damage from their recoverable health (from the Wavu wiki summary; whether the victim must be standing is not checked here). Heat Smash and Rage Art are stand-ins: they are damage bonuses on your next landed hit, armed with a key, not real moves. bonus_pct_of_max, armed_ticks and heat_start_heals_pct_of_pool are my estimates for fun, not Tekken's numbers. slowmo_fx slows the whole game for fx_frames screen frames at fx_speed_scale (1.0 = normal) when a Heat Smash or Rage Art lands. It is an experiment: it is off until the user tests it, and it turns itself off if the game refuses it. fx_method names which hook slows the game: global_speed, scene_time_scale or max_fps.",
   "columns": [
     "id",
     "enabled",
@@ -22,6 +22,7 @@
     "bonus_pct_of_max",
     "fx_speed_scale",
     "fx_frames",
+    "fx_method",
     "key_p1",
     "key_p2",
     "uses_hooks",
@@ -51,6 +52,7 @@
       "bonus_pct_of_max": "n/a",
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
+      "fx_method": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -84,6 +86,7 @@
       "bonus_pct_of_max": "n/a",
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
+      "fx_method": "n/a",
       "key_p1": 112,
       "key_p2": 113,
       "uses_hooks": [
@@ -121,6 +124,7 @@
       "bonus_pct_of_max": "n/a",
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
+      "fx_method": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -153,6 +157,7 @@
       "bonus_pct_of_max": 15,
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
+      "fx_method": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
@@ -187,6 +192,7 @@
       "bonus_pct_of_max": 18,
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
+      "fx_method": "n/a",
       "key_p1": 114,
       "key_p2": 115,
       "uses_hooks": [
@@ -221,14 +227,17 @@
       "bonus_pct_of_max": "n/a",
       "fx_speed_scale": 0.35,
       "fx_frames": 45,
+      "fx_method": "global_speed",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [
-        "global_speed"
+        "global_speed",
+        "scene_time_scale",
+        "max_fps"
       ],
       "status": "implemented",
       "verified": false,
-      "note": "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call."
+      "note": "Experimental impact slow-motion: when a Heat Smash or Rage Art lands, slow the game to 35% for about 0.75 seconds. Off by default; try the test button in the panel first, then tick the box. It turns itself off if the game refuses the call. Test 2026-10-07: the global speed method did not visibly slow the game, so two other methods (scene time scale, lower frame cap) can be selected in the panel and tried."
     },
     {
       "id": "hitstop_research",
@@ -251,6 +260,7 @@
       "bonus_pct_of_max": "n/a",
       "fx_speed_scale": "n/a",
       "fx_frames": "n/a",
+      "fx_method": "n/a",
       "key_p1": "n/a",
       "key_p2": "n/a",
       "uses_hooks": [

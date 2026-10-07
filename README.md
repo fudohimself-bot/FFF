@@ -2,7 +2,7 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: Rage, Heat, Heat Smash and Rage Art work and feel good in offline play (user report, 2026-10-07); the impact slow-motion and the hit-freeze readouts are new and untested.** In real offline matches every field the mod needs read correctly and health writes were kept. The rules are tested against a fake match and a fake REFramework (89 tests).
+**Status: Rage, Heat, Heat Smash and Rage Art work and feel good in offline play (user report, 2026-10-07); the impact slow-motion and the hit-freeze readouts are new and untested.** In real offline matches every field the mod needs read correctly and health writes were kept. The rules are tested against a fake match and a fake REFramework (95 tests).
 
 ## What it adds
 
@@ -15,7 +15,7 @@ Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (l
 | Heat Smash (stand-in) | Press the Heat key again while in Heat to arm it for 2 seconds. Your next hit deals 15% of max health extra and uses up your Heat. If it doesn't land in time, the Heat is spent anyway. A block doesn't use it up | built, untested in game. Not the real move: no animation or armor |
 | Rage Art (stand-in) | While in Rage, press **F3** (P2 **F4**), once per round. Your next hit within 2 seconds deals 18% of max health extra, removes the opponent's recoverable health, wins back some of yours and ends your Rage. If it misses, Rage still ends | built, untested in game. Not the real move: no cinematic |
 | On-screen readout | Heat bar, Rage and recoverable health for both fighters, from the mod itself | built, untested in game |
-| Impact slow-motion | When a Heat Smash or Rage Art lands, the whole game slows to 35% for about 0.75 seconds | experimental, **off by default**: press the test button in the panel first, then tick the box. It turns itself off if the game refuses it |
+| Impact slow-motion | When a Heat Smash or Rage Art lands, the game slows to 35% for about 0.75 seconds | experimental, **off by default**. The first method (global speed) did not visibly slow the game in testing, so the panel now offers two more methods (scene time scale, lower frame cap). Try each with the test button, then tick the box |
 | Hit freeze (weightier hits) | Find which field is the game's hit freeze and whether it can be written | research: the panel shows three candidates live |
 | Juggle scaling | Longer air combos | research only, not built |
 

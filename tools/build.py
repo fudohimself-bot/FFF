@@ -18,12 +18,12 @@ KIND_REQUIRES = {
              "chip_can_ko", "recover_pct_of_max_per_landed_attack", "hit_trims_recoverable_pct", "heat_start_heals_pct_of_pool", "key_p1", "key_p2"],
     "heat_smash": ["armed_ticks", "bonus_pct_of_max"],
     "rage_art": ["armed_ticks", "bonus_pct_of_max", "uses_per_round", "key_p1", "key_p2"],
-    "slowmo_fx": ["fx_speed_scale", "fx_frames"],
+    "slowmo_fx": ["fx_speed_scale", "fx_frames", "fx_method"],
     "juggle_scaling": [],
     "hitstop_research": [],
 }
 # Hooks a kind writes to: the hook row must allow writing.
-KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "heat_smash": ["hp_now"], "rage_art": ["hp_now"], "slowmo_fx": ["global_speed"], "juggle_scaling": [], "hitstop_research": []}
+KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "heat_smash": ["hp_now"], "rage_art": ["hp_now"], "slowmo_fx": ["global_speed", "scene_time_scale", "max_fps"], "juggle_scaling": [], "hitstop_research": []}
 STATUS_BUILT = "implemented"
 
 
@@ -75,6 +75,8 @@ def preflight(hooks, mechs):
             used.add(hid)
             if hid not in hook_ids:
                 errors.append(f"mechanics.{rid}.uses_hooks: '{hid}' does not exist in the hooks sheet")
+        if kind == "slowmo_fx" and row.get("fx_method") not in hook_ids:
+            errors.append(f"mechanics.{rid}.fx_method: '{row.get('fx_method')}' is not a hook in the hooks sheet")
         for hid in KIND_WRITES[kind]:
             if hid not in row.get("uses_hooks", []):
                 errors.append(f"mechanics.{rid}: writes '{hid}' but does not list it in uses_hooks")

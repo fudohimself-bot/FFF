@@ -164,7 +164,7 @@ local HOOKS = {
     ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
     ["read_verified"] = "n/a",
     ["write_verified"] = false,
-    ["evidence"] = "None yet. The panel has a test button; the probe checks the engine type exists."
+    ["evidence"] = "User test 2026-10-07: pressing the panel's test button did not visibly slow the game (whether the call errored is unknown). Either SF6 ignores global speed or the call was refused."
   },
   {
     ["id"] = "sleep_time",
@@ -216,6 +216,37 @@ local HOOKS = {
     ["read_verified"] = false,
     ["write_verified"] = "n/a",
     ["evidence"] = "Not in the probe's field list for the fighter object. The probe will say whether reading it works."
+  },
+  {
+    ["id"] = "scene_time_scale",
+    ["kind"] = "api",
+    ["path_steps"] = {
+      "via.SceneManager",
+      "get_CurrentScene",
+      "set_TimeScale"
+    },
+    ["access"] = "w",
+    ["value_type"] = "float",
+    ["purpose"] = "Second way to slow the game: the current scene's time scale",
+    ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
+    ["read_verified"] = "n/a",
+    ["write_verified"] = false,
+    ["evidence"] = "None yet."
+  },
+  {
+    ["id"] = "max_fps",
+    ["kind"] = "api",
+    ["path_steps"] = {
+      "via.Application",
+      "set_MaxFps"
+    },
+    ["access"] = "w",
+    ["value_type"] = "float",
+    ["purpose"] = "Third way to slow the game: lower the frame cap, which slows anything that advances one step per frame; the original cap is restored afterwards",
+    ["source"] = "A common REFramework pattern for RE Engine games; not seen working in SF6 yet",
+    ["read_verified"] = "n/a",
+    ["write_verified"] = false,
+    ["evidence"] = "None yet."
   }
 }
 
@@ -227,6 +258,16 @@ if re ~= nil and sdk ~= nil then
         key_state = function() return reframework ~= nil and reframework.is_key_down ~= nil end,
         global_speed = function()
             return sdk.get_native_singleton("via.Application") ~= nil and sdk.find_type_definition("via.Application") ~= nil
+        end,
+        max_fps = function()
+            local app = sdk.get_native_singleton("via.Application")
+            local t = sdk.find_type_definition("via.Application")
+            return app ~= nil and t ~= nil and tonumber(sdk.call_native_func(app, t, "get_MaxFps")) ~= nil
+        end,
+        scene_time_scale = function()
+            local sm = sdk.get_native_singleton("via.SceneManager")
+            local t = sdk.find_type_definition("via.SceneManager")
+            return sm ~= nil and t ~= nil and sdk.call_native_func(sm, t, "get_CurrentScene") ~= nil
         end,
     }
 

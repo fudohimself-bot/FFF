@@ -2,14 +2,14 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: Rage verified in game, Heat partly.** In the real game (2026-10-07) every field the mod needs reads correctly, health writes are kept, Rage turns on at low health, and forced-Rage and Heat hits both logged a +15% bonus. Chip damage on a blocked hit also worked in Training mode. The F1 key starts Heat. Still unexplained: Heat sometimes turned off earlier than expected (the panel now records the reason). The rules are also tested against a fake match and a fake REFramework (46 tests).
+**Status: Rage and Heat verified in game.** In real offline matches (2026-10-07) every field the mod needs reads correctly, health writes are kept, Rage turns on at low health, and Rage and Heat hits both logged a +15% bonus. Chip damage on a blocked hit worked in Training mode, the F1 key starts Heat, and Heat ends after its 10 seconds as designed. Not built yet: juggle scaling. Still unknown: long-session behaviour of SF6's rollback, and whether the on-screen health bar always follows the written value. The rules are also tested against a fake match and a fake REFramework (49 tests).
 
 ## What it adds
 
 | System | What it does | Status |
 |---|---|---|
 | Rage | A fighter at or under 20% health deals 15% more damage | built, verified in game |
-| Heat | P1 presses **F1** (P2 **F2**) for 10 seconds of +15% damage and chip damage on blocked hits, then a 20 second cooldown. Keyboard only: REFramework can't read gamepad buttons | built, bonus, chip and F1 key verified in game; early turn-off under investigation |
+| Heat | P1 presses **F1** (P2 **F2**) for 10 seconds of +15% damage and chip damage on blocked hits, then a 20 second cooldown. Keyboard only: REFramework can't read gamepad buttons | built, verified in game |
 | Juggle scaling | Longer air combos | research only, not built |
 
 Both built systems add their bonus by lowering the victim's health after a hit. SF6 accepted these writes in real offline matches. What isn't known yet is how the game's rollback system behaves over a long session, and whether the on-screen health bar always follows the written value.

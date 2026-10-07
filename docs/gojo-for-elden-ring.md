@@ -19,10 +19,12 @@ Both games are on the D: drive. These are guesses from your FF16 path; check the
 
 ## Tools (all free, you download them)
 
+**Shortcut:** double-click `tools\windows\get_tools.bat` from this project. It downloads all of the tools below (and Part 2's) into `D:\GojoMod\tools`, plus the Cursed Clash mapping files, and checks that both games are where it expects. Not yet run on a real PC.
+
 | Tool | For | Link |
 |---|---|---|
 | FModel | Opening Cursed Clash's packs and exporting Gojo's model and textures | https://fmodel.app |
-| Blender (4.x) | Fitting Gojo onto the Elden Ring body | https://www.blender.org/download/ |
+| Blender (5.1 or newer; Soulstruct for Blender needs it) | Fitting Gojo onto the Elden Ring body | https://www.blender.org/download/ |
 | Soulstruct for Blender | Importing and exporting Elden Ring models (FLVER) in Blender | https://github.com/Grimrukh/soulstruct-blender |
 | UXM Selective Unpacker | Unpacking Elden Ring's game files so the armor files can be read | https://github.com/Nordgaren/UXM-Selective-Unpack |
 | Smithbox | Editing Elden Ring's armor table (which body parts the armor hides) | https://github.com/vawser/Smithbox |

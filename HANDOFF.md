@@ -8,6 +8,14 @@ The user asked to "merge" Elden Ring and Jujutsu Kaisen Cursed Clash. A real mer
 
 Branch: `gojo-elden-ring` (this project only). The user's earlier SF6 Tekken Mode project lives on `claude/ff16-fortnite-melty-mashup-o6arrd`; leave it alone. Do not open a pull request unless the user asks.
 
+## Starting a local session on the user's PC
+
+The user moved from the cloud session to a local Claude Code session on their Windows PC, so the next session can run commands there directly. First steps for it:
+
+1. Run `tools\windows\get_tools.bat` (or `powershell -ExecutionPolicy Bypass -File tools\windows\get_tools.ps1`). It downloads every tool into `D:\GojoMod\tools` (latest GitHub releases, portable Blender 5.1.2, the Cursed Clash `.usmap` files) and checks both game folders. It was written in the cloud session and **has not been run yet**; fix it if a download fails.
+2. Ask before touching anything inside either game's folder.
+3. Continue with step 1 of `docs/gojo-for-elden-ring.md`.
+
 ## Where it stands
 
 - Plan: `docs/gojo-for-elden-ring.md`.
@@ -18,7 +26,7 @@ Branch: `gojo-elden-ring` (this project only). The user's earlier SF6 Tekken Mod
 
 ## The user
 
-- Windows; the Desktop is inside OneDrive (`C:\Users\fudoh\OneDrive\Desktop`). No Blender installed yet.
+- Windows; the Desktop is inside OneDrive (`C:\Users\fudoh\OneDrive\Desktop`). No Blender installed yet (`get_tools` downloads a portable Blender 5.1.2; Soulstruct for Blender needs 5.1 or newer).
 - Not a programmer. Prefers plain language and one clear step at a time, with exact commands and where to paste them.
 
 ## Ground rules

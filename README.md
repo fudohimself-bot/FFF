@@ -2,7 +2,7 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: partly verified.** The first probe in the real game (2026-10-07) read every field fine: health, max health is still to be read, block timer, match timer, round number and the keyboard check. **Writing health has not been tested yet**, and Rage and Heat depend on it, so treat the mod as untested until the write test below passes. The rules are tested against a fake match and a fake REFramework (41 tests).
+**Status: game access verified, Rage and Heat not yet played.** In the real game (2026-10-07) the probe read every field it needs (health, max health, block timer, match timer, round number, keyboard) and a test write of 1 health point was kept by the game. What is still unproven is the mod's behaviour in an actual fight: that Rage and Heat bonuses land on real hits, that Heat's key works, and that chip damage triggers on a block. The rules are tested against a fake match and a fake REFramework (41 tests).
 
 ## What it adds
 

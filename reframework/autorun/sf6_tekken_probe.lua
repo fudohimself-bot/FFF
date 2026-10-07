@@ -48,8 +48,8 @@ local HOOKS = {
     ["purpose"] = "Read health to find damage taken and Rage threshold; write it to add bonus damage and chip damage",
     ["source"] = "SF6_replay_capture: cPlayer[i].vital_new (read only there; writing is unproven)",
     ["read_verified"] = true,
-    ["write_verified"] = false,
-    ["evidence"] = "Probe 2026-10-07: both players read 10000. Write not tested yet."
+    ["write_verified"] = true,
+    ["evidence"] = "Probe 2026-10-07: both players read 10000 then 9250/10000. Write test: wrote 8349 over 8350; value was still 8349 one frame later (not reverted). Later reads were lower (7749 at 30 frames, 6849 at 120) because P1 was taking damage, not a revert. A bonus write during a real hit is still to be seen."
   },
   {
     ["id"] = "guard_time",
@@ -113,9 +113,9 @@ local HOOKS = {
     ["value_type"] = "int",
     ["purpose"] = "Real maximum health, for the Rage threshold and Heat chip size (replaces remembering the highest health seen)",
     ["source"] = "Probe 2026-10-07 field list: vital_max exists on the fighter object",
-    ["read_verified"] = false,
+    ["read_verified"] = true,
     ["write_verified"] = "n/a",
-    ["evidence"] = "Field name seen in the probe's field list; its value has not been read yet."
+    ["evidence"] = "Probe 2026-10-07: both players read 10000."
   }
 }
 

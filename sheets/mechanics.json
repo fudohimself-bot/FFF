@@ -63,7 +63,7 @@
       ],
       "status": "implemented",
       "verified": false,
-      "note": "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) for a timed burst of extra damage plus chip damage on blocked hits, then a cooldown. Ticks are match ticks, about 60 per second. Keyboard only. In-game 2026-10-07: starting Heat from the debug button logged a +15% bonus (P2 8176 -> 8046). Chip damage on block verified in Training mode (8 chip hits counted). The F1 key is untested, and Heat was reported to turn off 'randomly': the panel now records why Heat ended."
+      "note": "Tekken 8 Heat: press the key (P1 F1 = 112, P2 F2 = 113) for a timed burst of extra damage plus chip damage on blocked hits, then a cooldown. Ticks are match ticks, about 60 per second. Keyboard only. In-game 2026-10-07: starting Heat from the debug button logged a +15% bonus (P2 8176 -> 8046). Chip damage on block verified in Training mode (8 chip hits counted). The F1 key starts Heat (confirmed by the user in game). Heat was reported to turn off 'randomly': the panel now records why Heat ended."
     },
     {
       "id": "juggle_scaling",

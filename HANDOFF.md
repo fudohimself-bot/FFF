@@ -36,6 +36,10 @@ Experimental and off by default: `slowmo_fx`. Only the `max_fps` method visibly 
 3. **Joshua model for Ken** (personal use; do not share or commit extracted assets). The user wants **Joshua at the older age in the red hooded cape, black tunic, red belt, black gloves, shaggy ginger hair**. FF16 character `c1002` body `b0001` was extracted, converted and rendered: it is a leather vest with shoulder plates and boots, no cape, so it is **not** the target. Next step: extract the game's `nxd` data tables (from `0001.pac`, via `FF16Tools.CLI nxd-to-sqlite`) to tie character names to `c####` IDs. Then rig onto Ken's skeleton in Blender with RE Mesh Editor. Plan and tools: `docs/joshua-for-ken.md`. Blender 4.2.3 worked headless in the cloud session; the user has no Blender installed.
 4. Research: knockback, wall carry and juggle scaling (fields `combo_dm_air`, `combo_scale`, `vector_zuri`, `damage_speed` exist on the fighter object); starting Heat from a gamepad button combo (the panel shows `pl_sw_now` bits so they can be decoded).
 
+## Side project: Gojo in Elden Ring (plan only)
+
+The user asked to "merge" Elden Ring and Jujutsu Kaisen Cursed Clash. A real merge isn't possible (different engines, no engine source; EldenRingHKS is just three behaviour scripts and the Cursed Clash UE5 Mod Kit has no game assets). Agreed scope: Gojo's Cursed Clash model replacing one Elden Ring armor set, loaded offline with Mod Engine 2. Plan and steps: `docs/gojo-for-elden-ring.md`. Both games are installed on the D: drive (exact folders not yet confirmed). Waiting on: Gojo's `CP_###` folder number in Cursed Clash, the armor set the user picks, then the two skeleton dumps. Work for this goes on branch `claude/brave-clarke-bg3tsj`.
+
 ## The user's PC (as learned in the cloud session)
 
 - Windows; the Desktop is inside OneDrive, so `%USERPROFILE%\Desktop` does not exist (use `C:\Users\fudoh\OneDrive\Desktop`).

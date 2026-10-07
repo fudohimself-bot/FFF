@@ -63,6 +63,10 @@ python3 -I tests/test_engine.py
 
 A personal-use model swap putting Joshua Rosfield from FF16 on Ken's default look. Plan and tools are in `docs/joshua-for-ken.md`; `tools/blender/dump_armature.py` dumps a skeleton from Blender so a bone map can be written. Nothing has been run on real models yet.
 
+## Gojo in Elden Ring (planned, separate)
+
+A separate personal-use mod: Gojo from Jujutsu Kaisen Cursed Clash as an Elden Ring armor set, offline only. Plan in `docs/gojo-for-elden-ring.md`. Nothing has been run yet.
+
 ## Credits
 
 Field names for SF6's battle data come from the community script [SF6_replay_capture](https://github.com/rkaganda/SF6_replay_capture) by rkaganda. Street Fighter 6 is a Capcom game. This project contains none of its files.

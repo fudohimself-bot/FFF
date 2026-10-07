@@ -12,7 +12,7 @@ Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (l
 | Heat | P1 presses **F1** (P2 **F2**) for 10 seconds of +15% damage and chip damage on blocked hits, then a 20 second cooldown. Keyboard only: REFramework can't read gamepad buttons | built, bonus verified in game; key and chip untested |
 | Juggle scaling | Longer air combos | research only, not built |
 
-Both built systems add their bonus by lowering the victim's health after a hit. Whether SF6 lets a script write health this way, and whether its rollback system overwrites it, is exactly what still has to be checked.
+Both built systems add their bonus by lowering the victim's health after a hit. SF6 accepted these writes in real offline matches. What isn't known yet is how the game's rollback system behaves over a long session, and whether the on-screen health bar always follows the written value.
 
 ## Offline only
 

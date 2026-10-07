@@ -262,6 +262,33 @@ class TekkenAccuracy(unittest.TestCase):
         self.m.tick(keys=keys)
         self.m.tick(keys=[False, False])
 
+    def test_gauge_model_reports_heat_state(self):
+        e = self.g.Engine
+        m0 = e.gauge_model(self.m.state, 0)
+        self.assertFalse(m0.active)
+        self.assertTrue(m0.available)
+        self.heat_on(0)
+        m = e.gauge_model(self.m.state, 0)
+        self.assertTrue(m.active)
+        self.assertAlmostEqual(m.fraction, 599 / 600, places=3)
+        self.assertAlmostEqual(m.seconds, 599 / 60.0, places=2)
+        self.assertFalse(m.available)
+        self.assertFalse(m.paused)
+
+    def test_gauge_model_marks_the_timer_paused_during_opponent_hitstun(self):
+        e = self.g.Engine
+        self.heat_on(0)
+        self.m.tick(hitstun=[0, 15])
+        self.assertTrue(e.gauge_model(self.m.state, 0).paused)
+        self.m.tick(hitstun=[0, 0])
+        self.assertFalse(e.gauge_model(self.m.state, 0).paused)
+
+    def test_gauge_model_recoverable_fraction(self):
+        e = self.g.Engine
+        self.heat_on(0)
+        self.m.tick(guard=[0, 12])  # chip 20 of 1000
+        self.assertAlmostEqual(e.gauge_model(self.m.state, 1).pool_fraction, 0.02, places=3)
+
     def test_rage_threshold_is_a_quarter_of_max_health(self):
         self.m.tick(hp=[250, 1000])  # exactly 25%: Rage
         self.assertTrue(self.m.state["p"][0]["rage"])
@@ -645,10 +672,17 @@ imgui = {
   slider_int = function(label, v, lo, hi) if fake.slide and fake.slide[1] == label then return true, fake.slide[2] end return false, v end,
   slider_float = function(label, v, lo, hi) if fake.slide and fake.slide[1] == label then return true, fake.slide[2] end return false, v end,
   button = function(label) return fake.press == label end,
+  get_display_size = function() return { x = 1920, y = 1080 } end,
   begin_window = function(name) fake.window = name; return true end, end_window = function() end,
   progress_bar = function(frac, size, text) table.insert(fake.bars, { frac = frac, text = text }) end,
 }
 Vector2f = { new = function(x, y) return { x = x, y = y } end }
+fake.draws = {}
+local function rec(kind) return function(...)
+  if fake.draw_error then error("draw refused") end
+  table.insert(fake.draws, { kind, ... })
+end end
+draw = { filled_rect = rec("fill"), outline_rect = rec("outline"), text = rec("text") }
 fake.bars = {}
 json = {
   dump_file = function(path, tbl) if fake.save_error then error("disk full") end fake.saved[path] = tbl; return true end,
@@ -737,23 +771,6 @@ class GlueWithFakeREFramework(unittest.TestCase):
         lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
         joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
         self.assertIn("Bonus health writes: 1 (last: P2 health 900 -> 890)", joined)
-
-    def test_hud_draws_a_heat_bar_and_survives_a_broken_imgui(self):
-        lua = self.boot("sf6_tekken_mode.lua")
-        self.frame(lua)
-        lua.execute("fake.keys[112] = true; battle.Game.stage_timer = 1")
-        self.frame(lua)
-        lua.execute("fake.keys[112] = false; fake.bars = {}; battle.Game.stage_timer = 2")
-        self.frame(lua)
-        bars = list(lua.eval("fake.bars").values())
-        self.assertEqual(len(bars), 1)
-        self.assertIn("P1 HEAT", bars[0]["text"])
-        lua.execute("imgui.progress_bar = function() error('no such function') end; battle.Game.stage_timer = 3")
-        self.frame(lua)  # must not raise, and must not break the rules
-        lua.execute("fake.ui_text = {}; for _, cb in ipairs(fake.ui_cbs) do cb() end")
-        joined = " ".join(str(v) for v in lua.eval("fake.ui_text").values())
-        self.assertIn("On-screen readout error", joined)
-        self.assertIn("P1  rage: false  heat: true", joined)
 
     def test_panel_shows_held_game_buttons_in_bits(self):
         lua = self.boot("sf6_tekken_mode.lua")
@@ -1035,6 +1052,174 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.assertTrue(lua.eval("SF6_TEKKEN.MECH.rage.enabled"))
         self.assertEqual(self._saved(lua).hitstop_boost.boost_frames, 3)
 
+    # ---- Heat gauge drawn on the screen
+    def _draws(self, lua):
+        return [list(d.values()) for d in lua.eval("fake.draws").values()]
+
+    def _start_heat_p1(self, lua):
+        self.frame(lua)
+        lua.execute("fake.keys[112] = true; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.keys[112] = false; battle.Game.stage_timer = 2; fake.draws = {}")
+        self.frame(lua)
+
+    def test_gauge_for_heat_is_orange_under_p1_and_a_dim_label_under_p2(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._start_heat_p1(lua)
+        d = self._draws(lua)
+        fills = [x for x in d if x[0] == "fill"]
+        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
+        edge, top, width = 1920 * g.gauge_edge_pct / 100, 1080 * g.gauge_y_pct / 100, 1920 * g.gauge_w_pct / 100
+        self.assertAlmostEqual(fills[0][1], edge - 2)  # P1's background starts at the left margin
+        self.assertAlmostEqual(fills[0][2], top - 2)
+        bar = [f for f in fills if f[5] == 0xFF1E9BFF][0]
+        self.assertAlmostEqual(bar[1], edge)  # starts at the left edge for P1
+        self.assertAlmostEqual(bar[3], width * (599 / 600), places=1)  # nearly full: Heat just started
+        texts = [x[1] for x in d if x[0] == "text"]
+        self.assertTrue(any(t.startswith("P1 HEAT  ") for t in texts), texts)
+        self.assertIn("P2 HEAT", texts)  # P2 still has Heat available
+
+    def test_p2_gauge_sits_at_the_right_edge(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("fake.keys[113] = true; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("fake.keys[113] = false; battle.Game.stage_timer = 2; fake.draws = {}")
+        self.frame(lua)
+        fills = [x for x in self._draws(lua) if x[0] == "fill"]
+        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
+        edge = 1920 * g.gauge_edge_pct / 100
+        bar = [f for f in fills if f[5] == 0xFF1E9BFF][0]
+        full_right = 1920 - edge
+        self.assertAlmostEqual(bar[1] + bar[3], full_right, places=0)  # drains toward its own (right) edge
+
+    def test_gauge_shrinks_as_heat_runs_down(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._start_heat_p1(lua)
+        for n in range(3, 303):
+            lua.execute(f"battle.Game.stage_timer = {n}; fake.draws = {{}}")
+            self.frame(lua)
+        bar = [x for x in self._draws(lua) if x[0] == "fill" and x[5] == 0xFF1E9BFF][0]
+        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
+        self.assertAlmostEqual(bar[3], 1920 * g.gauge_w_pct / 100 * 0.5, delta=3)
+
+    def test_gauge_turns_pale_blue_while_the_timer_is_paused(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._start_heat_p1(lua)
+        lua.execute("players[1].damage_time = 20; battle.Game.stage_timer = 3; fake.draws = {}")
+        self.frame(lua)
+        colors = [x[5] for x in self._draws(lua) if x[0] == "fill"]
+        self.assertIn(0xFFFFDCAA, colors)
+        self.assertNotIn(0xFF1E9BFF, colors)
+
+    def test_gauge_flashes_red_when_nearly_out(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.heat.duration_ticks = 40")
+        self._start_heat_p1(lua)
+        seen = set()
+        for n in range(3, 3 + 36):
+            lua.execute(f"battle.Game.stage_timer = {n}; fake.draws = {{}}")
+            self.frame(lua)
+            seen |= {x[5] for x in self._draws(lua) if x[0] == "fill"}
+        self.assertIn(0xFF1E1EE6, seen)  # red phase
+        self.assertIn(0xFF1E9BFF, seen)  # orange phase
+
+    def test_no_label_for_heat_that_has_been_used_up(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.heat.duration_ticks = 5")
+        self._start_heat_p1(lua)
+        for n in range(3, 20):
+            lua.execute(f"battle.Game.stage_timer = {n}; fake.draws = {{}}")
+            self.frame(lua)
+        texts = [x[1] for x in self._draws(lua) if x[0] == "text"]
+        self.assertNotIn("P1 HEAT", texts)
+        self.assertNotIn("P1 HEAT  0.0", texts)
+        self.assertIn("P2 HEAT", texts)
+
+    def test_gauge_shows_a_thin_recoverable_bar_after_chip(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._start_heat_p1(lua)
+        lua.execute("players[1].guard_time = 12; battle.Game.stage_timer = 3")  # P2 blocks: chip -> recoverable
+        self.frame(lua)
+        lua.execute("players[1].guard_time = 0; battle.Game.stage_timer = 4; fake.draws = {}")
+        self.frame(lua)
+        thin = [x for x in self._draws(lua) if x[0] == "fill" and x[5] == 0xD0F0F0F0]
+        self.assertTrue(thin, "recoverable bar missing")
+        self.assertEqual(thin[0][4], 4)  # thin: 4 px
+
+    def test_gauge_shows_a_rage_label_in_red(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua)
+        lua.execute("players[1].vital_new = 100; battle.Game.stage_timer = 1")
+        self.frame(lua)
+        lua.execute("battle.Game.stage_timer = 2; fake.draws = {}")
+        self.frame(lua)
+        texts = [(x[1], x[4]) for x in self._draws(lua) if x[0] == "text"]
+        self.assertIn(("P2 RAGE", 0xFF3C3CFF), texts)
+
+    def test_gauge_error_stays_until_it_is_switched_back_on(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.draw_error = true")
+        self._start_heat_p1(lua)
+        lua.execute("battle.Game.stage_timer = 3"); self.frame(lua)
+        lua.execute("battle.Game.stage_timer = 4"); self.frame(lua)
+        self.assertIn("Heat gauge error: ", self._ui(lua))  # still there two frames later
+        lua.execute("fake.draw_error = nil; fake.toggle = 'heat_gauge enabled'; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.toggle = nil")
+        self.assertNotIn("Heat gauge error: ", self._ui(lua))
+        self.assertTrue(lua.eval("SF6_TEKKEN.MECH.heat_gauge.enabled"))
+
+    def test_gauge_labels_for_armed_stand_in_moves(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        self._arm_smash_and_land(lua)  # lands, so nothing armed afterwards
+        lua.execute("SF6_TEKKEN.MECH.hitstop_boost.enabled = false")
+        self.frame(lua)
+        lua2 = self.boot("sf6_tekken_mode.lua")
+        self.frame(lua2)
+        lua2.execute("fake.keys[112] = true; battle.Game.stage_timer = 1")
+        self.frame(lua2)
+        lua2.execute("fake.keys[112] = false; battle.Game.stage_timer = 2")
+        self.frame(lua2)
+        lua2.execute("fake.keys[112] = true; battle.Game.stage_timer = 3")
+        self.frame(lua2)
+        lua2.execute("fake.keys[112] = false; battle.Game.stage_timer = 4; fake.draws = {}")
+        self.frame(lua2)
+        texts = [x[1] for x in self._draws(lua2) if x[0] == "text"]
+        self.assertIn("P1 HEAT SMASH ARMED", texts)
+
+    def test_gauge_can_be_switched_off(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("SF6_TEKKEN.MECH.heat_gauge.enabled = false; fake.draws = {}")
+        self._start_heat_p1(lua)
+        self.assertEqual(self._draws(lua), [])
+
+    def test_gauge_failure_turns_it_off_and_leaves_the_rules_alone(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.draw_error = true")
+        self._start_heat_p1(lua)  # must not raise
+        self.assertFalse(lua.eval("SF6_TEKKEN.MECH.heat_gauge.enabled"))
+        ui = self._ui(lua)
+        self.assertIn("Heat gauge error: ", ui)
+        self.assertIn("P1  rage: false  heat: true", ui)  # Heat itself still works
+
+    def test_gauge_layout_sliders_change_and_save_the_layout(self):
+        lua = self.boot("sf6_tekken_mode.lua")
+        lua.execute("fake.slide = { 'gauge thickness (pixels)', 24 }; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.slide = nil")
+        self.frame(lua)
+        self.assertEqual(lua.eval("SF6_TEKKEN.MECH.heat_gauge.gauge_h_px"), 24)
+        self.assertEqual(self._saved(lua).heat_gauge.gauge_h_px, 24)
+        lua.execute("fake.slide = { 'gauge height on screen (%)', 25.5 }; for _, cb in ipairs(fake.ui_cbs) do cb() end; fake.slide = nil")
+        self.assertAlmostEqual(lua.eval("SF6_TEKKEN.MECH.heat_gauge.gauge_y_pct"), 25.5)
+
+    def test_saved_gauge_layout_is_loaded_and_clamped(self):
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        lua.execute(FAKE_REFRAMEWORK)
+        lua.execute('fake.preload = { ["sf6_tekken/settings.json"] = { heat_gauge = { gauge_w_pct = 999, gauge_y_pct = 12.5, gauge_h_px = -3 } } }')
+        lua.execute((ROOT / "reframework" / "autorun" / "sf6_tekken_mode.lua").read_text())
+        g = lua.eval("SF6_TEKKEN.MECH.heat_gauge")
+        self.assertEqual(g.gauge_w_pct, 45)
+        self.assertAlmostEqual(g.gauge_y_pct, 12.5)
+        self.assertEqual(g.gauge_h_px, 4)
+
     def test_no_match_is_handled(self):
         lua = self.boot("sf6_tekken_mode.lua")
         lua.execute("fake.no_battle = true")
@@ -1064,6 +1249,7 @@ class GlueWithFakeREFramework(unittest.TestCase):
         self.assertTrue(by_id["global_speed"]["ok"])
         self.assertTrue(by_id["scene_time_scale"]["ok"])
         self.assertTrue(by_id["max_fps"]["ok"])
+        self.assertTrue(by_id["draw_screen"]["ok"])
         self.assertTrue(by_id["hit_stop"]["ok"])
         self.assertTrue(by_id["sleep_time"]["ok"])
 

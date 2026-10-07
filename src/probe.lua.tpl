@@ -19,6 +19,10 @@ if re ~= nil and sdk ~= nil then
             local t = sdk.find_type_definition("via.Application")
             return app ~= nil and t ~= nil and tonumber(sdk.call_native_func(app, t, "get_MaxFps")) ~= nil
         end,
+        draw_screen = function()
+            return draw ~= nil and draw.filled_rect ~= nil and draw.outline_rect ~= nil and draw.text ~= nil
+                and imgui.get_display_size ~= nil and imgui.get_display_size().x ~= nil
+        end,
         scene_time_scale = function()
             local sm = sdk.get_native_singleton("via.SceneManager")
             local t = sdk.find_type_definition("via.SceneManager")

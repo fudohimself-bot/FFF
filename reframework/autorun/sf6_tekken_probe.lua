@@ -247,6 +247,21 @@ local HOOKS = {
     ["read_verified"] = "n/a",
     ["write_verified"] = true,
     ["evidence"] = "Probe 2026-10-07: reading the cap works. User test: this is the only method that visibly slowed the game, and the user was unsure how it felt (a lower frame rate looks choppy)."
+  },
+  {
+    ["id"] = "draw_screen",
+    ["kind"] = "api",
+    ["path_steps"] = {
+      "draw",
+      "filled_rect"
+    },
+    ["access"] = "w",
+    ["value_type"] = "draw call",
+    ["purpose"] = "Paint the Heat gauge, labels and recoverable bar directly on the game screen (rectangles and text), and read the screen size to place them",
+    ["source"] = "REFramework's built-in draw API (draw.filled_rect, draw.outline_rect, draw.text) and imgui.get_display_size(), from the REFramework book; colours are 0xAABBGGRR",
+    ["read_verified"] = "n/a",
+    ["write_verified"] = false,
+    ["evidence"] = "None yet: not seen drawing in SF6."
   }
 }
 
@@ -263,6 +278,10 @@ if re ~= nil and sdk ~= nil then
             local app = sdk.get_native_singleton("via.Application")
             local t = sdk.find_type_definition("via.Application")
             return app ~= nil and t ~= nil and tonumber(sdk.call_native_func(app, t, "get_MaxFps")) ~= nil
+        end,
+        draw_screen = function()
+            return draw ~= nil and draw.filled_rect ~= nil and draw.outline_rect ~= nil and draw.text ~= nil
+                and imgui.get_display_size ~= nil and imgui.get_display_size().x ~= nil
         end,
         scene_time_scale = function()
             local sm = sdk.get_native_singleton("via.SceneManager")

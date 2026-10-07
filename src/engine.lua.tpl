@@ -16,7 +16,7 @@ local Engine = {}
 
 local function new_player()
     return { max_hp = 0, last_hp = nil, last_guard = 0, rage = false, key_prev = false,
-             heat_left = 0, heat_used = false, heat_paused = 0, heat_ran = 0, pool = 0,
+             heat_left = 0, heat_used = false, heat_paused = 0, heat_ran = 0, heat_pausing = false, pool = 0,
              smash_left = 0, art_left = 0, art_used = false, rage_spent = false, key_prev_art = false }
 end
 
@@ -65,6 +65,24 @@ function Engine.heat_left(st, i)
     return st.p[i].heat_left
 end
 
+-- Everything the on-screen gauge needs to know about one fighter.
+function Engine.gauge_model(st, i)
+    local p = st.p[i]
+    local active = p.heat_left > 0
+    local duration = MECH.heat.duration_ticks
+    return {
+        active = active,
+        fraction = active and math.min(1.0, p.heat_left / duration) or 0,
+        seconds = p.heat_left / 60.0,
+        paused = active and p.heat_pausing == true,
+        available = not p.heat_used,
+        smash = p.smash_left > 0,
+        art = p.art_left > 0,
+        rage = p.rage == true,
+        pool_fraction = p.max_hp > 0 and (p.pool / p.max_hp) or 0,
+    }
+end
+
 function Engine.heat_available(st, i)
     return not st.p[i].heat_used
 end
@@ -98,9 +116,11 @@ function Engine.step(st, snap)
     if enabled("heat") then
         for i = 0, 1 do
             local p = st.p[i]
+            p.heat_pausing = false
             if p.heat_left > 0 then
                 local stunned = snap.hitstun ~= nil and (snap.hitstun[1 - i] or 0) > 0
                 if MECH.heat.pause_while_opponent_in_hitstun and stunned then
+                    p.heat_pausing = true
                     p.heat_paused = p.heat_paused + 1
                 else
                     p.heat_left = p.heat_left - 1
@@ -324,7 +344,7 @@ if re ~= nil and sdk ~= nil then
     local last_error = nil
     local last_status = "waiting for a match"
     local stats = { writes = 0, last = "none yet", guard_now = { [0] = 0, [1] = 0 }, guard_max = { [0] = 0, [1] = 0 }, hit_now = { [0] = 0, [1] = 0 }, hit_max = { [0] = 0, [1] = 0 }, btn_now = { [0] = 0, [1] = 0 }, freeze_boosts = 0, freeze_error = nil }
-    local hud = { show = true, error = nil }
+    local hud = { error = nil, frame = 0 }
 
     -- Settings that survive restarting the game: saved to reframework/data/sf6_tekken/settings.json.
     local SETTINGS_FILE = "sf6_tekken/settings.json"
@@ -332,8 +352,10 @@ if re ~= nil and sdk ~= nil then
         rage = { "enabled" }, heat = { "enabled" }, heat_smash = { "enabled" }, rage_art = { "enabled" },
         slowmo_fx = { "enabled", "fx_speed_scale", "fx_frames", "fx_method" },
         hitstop_boost = { "enabled", "boost_frames", "big_boost_frames" },
+        heat_gauge = { "enabled", "gauge_y_pct", "gauge_w_pct", "gauge_h_px", "gauge_edge_pct" },
     }
-    local LIMITS = { fx_speed_scale = { 0.1, 1.0 }, fx_frames = { 5, 120 }, boost_frames = { 0, 20 }, big_boost_frames = { 0, 40 } }
+    local LIMITS = { fx_speed_scale = { 0.1, 1.0 }, fx_frames = { 5, 120 }, boost_frames = { 0, 20 }, big_boost_frames = { 0, 40 },
+                     gauge_y_pct = { 0, 40 }, gauge_w_pct = { 10, 45 }, gauge_h_px = { 4, 40 }, gauge_edge_pct = { 0, 30 } }
     local VALID_METHODS = { global_speed = true, scene_time_scale = true, max_fps = true }
     local DEFAULTS = {}
     for id, keys in pairs(SAVE_KEYS) do
@@ -536,27 +558,56 @@ if re ~= nil and sdk ~= nil then
         return table.concat(out)
     end
 
-    -- Small on-screen readout of Heat time, Rage and recoverable health for both fighters.
-    local function draw_hud()
-        if not hud.show then return end
-        imgui.begin_window("Tekken Heat", true, 0)
-        for i = 0, 1 do
-            local p = state.p[i]
-            local label = string.format("P%d", i + 1)
-            if Engine.heat_active(state, i) then
-                local frac = p.heat_left / MECH.heat.duration_ticks
-                imgui.progress_bar(frac, Vector2f.new(220, 14), string.format("%s HEAT %.1fs", label, p.heat_left / 60.0))
-            elseif p.heat_used then
-                imgui.text(label .. " Heat used this round")
-            else
-                imgui.text(label .. " Heat ready")
+    -- Heat gauge painted straight onto the game screen with REFramework's draw API. Colours are 0xAABBGGRR.
+    local COLOR = {
+        bg = 0xC0101010, edge = 0xFFE6E6E6, edge_dim = 0x90A0A0A0, text = 0xFFFFFFFF, text_dim = 0xA0D0D0D0,
+        heat = 0xFF1E9BFF, low = 0xFF1E1EE6, paused = 0xFFFFDCAA, rage = 0xFF3C3CFF, pool = 0xD0F0F0F0,
+    }
+
+    local function draw_gauge(i, screen_w, screen_h)
+        local g = MECH.heat_gauge
+        local w = screen_w * g.gauge_w_pct / 100.0
+        local h = g.gauge_h_px
+        local edge = screen_w * g.gauge_edge_pct / 100.0
+        local x = (i == 0) and edge or (screen_w - edge - w)
+        local y = screen_h * g.gauge_y_pct / 100.0
+        local m = Engine.gauge_model(state, i)
+        local tag = string.format("P%d", i + 1)
+
+        draw.filled_rect(x - 2, y - 2, w + 4, h + 4, COLOR.bg)
+        if m.active then
+            local fw = w * m.fraction
+            local fx = (i == 0) and x or (x + w - fw)  -- each bar drains toward its own screen edge
+            local color = COLOR.heat
+            if m.paused then
+                color = COLOR.paused  -- the timer is stopped while the opponent is being hit
+            elseif m.fraction < 0.25 and math.floor(hud.frame / 6) % 2 == 0 then
+                color = COLOR.low
             end
-            if p.smash_left > 0 then imgui.text(label .. " HEAT SMASH ARMED") end
-            if p.art_left > 0 then imgui.text(label .. " RAGE ART ARMED") end
-            if p.rage then imgui.text(label .. " RAGE") end
-            if p.pool > 0 then imgui.text(string.format("%s recoverable %d", label, p.pool)) end
+            draw.filled_rect(fx, y, fw, h, color)
+            draw.text(string.format("%s HEAT  %.1f", tag, m.seconds), x + 2, y + h + 5, COLOR.text)
+        elseif m.available then
+            draw.text(tag .. " HEAT", x + 2, y + h + 5, COLOR.text_dim)
         end
-        imgui.end_window()
+        draw.outline_rect(x - 2, y - 2, w + 4, h + 4, m.active and COLOR.edge or COLOR.edge_dim)
+
+        local ty = y + h + 5
+        if m.pool_fraction > 0 then
+            -- recoverable health: a thin bar, full at 20% of max health
+            draw.filled_rect(x, y + h + 5, w * math.min(1.0, m.pool_fraction * 5), 4, COLOR.pool)
+            ty = ty + 8
+        end
+        if m.active or m.available then ty = ty + 14 end
+        if m.rage then draw.text(tag .. " RAGE", x + 2, ty, COLOR.rage); ty = ty + 14 end
+        if m.smash then draw.text(tag .. " HEAT SMASH ARMED", x + 2, ty, COLOR.heat); ty = ty + 14 end
+        if m.art then draw.text(tag .. " RAGE ART ARMED", x + 2, ty, COLOR.rage) end
+    end
+
+    local function draw_hud()
+        if MECH.heat_gauge == nil or not MECH.heat_gauge.enabled then return end
+        hud.frame = hud.frame + 1
+        local size = imgui.get_display_size()
+        for i = 0, 1 do draw_gauge(i, size.x, size.y) end
     end
 
     re.on_frame(function()
@@ -609,8 +660,11 @@ if re ~= nil and sdk ~= nil then
         end
         last_status = "running (round " .. tostring(snap.round) .. ")"
         local okh, errh = pcall(draw_hud)
-        hud.error = (not okh) and tostring(errh) or nil
-        if not okh then hud.show = false end  -- stop retrying a readout that errors every frame
+        if not okh then
+            -- Keep the message until the gauge is switched back on, so the panel can say why it stopped.
+            hud.error = tostring(errh)
+            if MECH.heat_gauge ~= nil then MECH.heat_gauge.enabled = false end  -- stop retrying a gauge that errors every frame
+        end
         for i = 0, 1 do
             stats.guard_now[i] = snap.guard[i]
             if snap.guard[i] > stats.guard_max[i] then stats.guard_max[i] = snap.guard[i] end
@@ -643,12 +697,13 @@ if re ~= nil and sdk ~= nil then
             imgui.text(string.format("Bonus health writes: %d (last: %s)", stats.writes, stats.last))
             imgui.text(string.format("Chip hits: %d   block timer now P1 %d / P2 %d, highest seen P1 %d / P2 %d",
                 state.chip_count, stats.guard_now[0], stats.guard_now[1], stats.guard_max[0], stats.guard_max[1]))
-            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art", "slowmo_fx", "hitstop_boost" }) do
+            for _, id in ipairs({ "rage", "heat", "heat_smash", "rage_art", "slowmo_fx", "hitstop_boost", "heat_gauge" }) do
                 if MECH[id] ~= nil then
                     local changed, value = imgui.checkbox(id .. " enabled", MECH[id].enabled)
                     if changed then
                         MECH[id].enabled = value
                         settings.dirty = true
+                        if id == "heat_gauge" and value then hud.error = nil end
                     end
                 end
             end
@@ -661,9 +716,20 @@ if re ~= nil and sdk ~= nil then
             end
             imgui.text(string.format("Held buttons (game bits) P1 %d [%s]  P2 %d [%s]",
                 stats.btn_now[0], bits(stats.btn_now[0]), stats.btn_now[1], bits(stats.btn_now[1])))
-            local hchanged, hvalue = imgui.checkbox("show on-screen Heat / Rage readout", hud.show)
-            if hchanged then hud.show = hvalue; hud.error = nil end
-            if hud.error then imgui.text("On-screen readout error: " .. hud.error) end
+            if hud.error then imgui.text("Heat gauge error: " .. hud.error) end
+            if MECH.heat_gauge ~= nil then
+                pcall(function()
+                    local g = MECH.heat_gauge
+                    local a, va = imgui.slider_float("gauge height on screen (%)", g.gauge_y_pct, 0.0, 40.0)
+                    if a then g.gauge_y_pct = va; settings.dirty = true end
+                    local b2, vb = imgui.slider_float("gauge width (% of screen)", g.gauge_w_pct, 10.0, 45.0)
+                    if b2 then g.gauge_w_pct = vb; settings.dirty = true end
+                    local c, vc = imgui.slider_float("gauge distance from edge (%)", g.gauge_edge_pct, 0.0, 30.0)
+                    if c then g.gauge_edge_pct = vc; settings.dirty = true end
+                    local d, vd = imgui.slider_int("gauge thickness (pixels)", g.gauge_h_px, 4, 40)
+                    if d then g.gauge_h_px = vd; settings.dirty = true end
+                end)
+            end
             imgui.text("Last Heat event: " .. state.last_event)
             imgui.text("Settings: " .. settings.note)
             if imgui.button("reset settings to defaults") then reset_settings() end

@@ -20,11 +20,12 @@ KIND_REQUIRES = {
     "rage_art": ["armed_ticks", "bonus_pct_of_max", "uses_per_round", "key_p1", "key_p2"],
     "slowmo_fx": ["fx_speed_scale", "fx_frames", "fx_method"],
     "hitstop_boost": ["boost_frames", "big_boost_frames"],
+    "heat_gauge": ["gauge_y_pct", "gauge_w_pct", "gauge_h_px", "gauge_edge_pct"],
     "juggle_scaling": [],
     "hitstop_research": [],
 }
 # Hooks a kind writes to: the hook row must allow writing.
-KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "heat_smash": ["hp_now"], "rage_art": ["hp_now"], "slowmo_fx": ["global_speed", "scene_time_scale", "max_fps"], "hitstop_boost": ["hit_stop"], "juggle_scaling": [], "hitstop_research": []}
+KIND_WRITES = {"rage": ["hp_now"], "heat": ["hp_now"], "heat_smash": ["hp_now"], "rage_art": ["hp_now"], "slowmo_fx": ["global_speed", "scene_time_scale", "max_fps"], "hitstop_boost": ["hit_stop"], "heat_gauge": ["draw_screen"], "juggle_scaling": [], "hitstop_research": []}
 STATUS_BUILT = "implemented"
 
 

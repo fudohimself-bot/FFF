@@ -2,7 +2,7 @@
 
 Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (local versus, training). A personal mod, not published on Melty.
 
-**Status: Rage, Heat, Heat Smash, Rage Art and the hit freeze boost work and feel good in offline play (user report, 2026-10-07); the impact slow-motion is off by default and looks choppy.** In real offline matches every field the mod needs read correctly, health writes were kept and the game honoured extra hit freeze frames. The rules are tested against a fake match and a fake REFramework (108 tests).
+**Status: Rage, Heat, Heat Smash, Rage Art and the hit freeze boost work and feel good in offline play (user report, 2026-10-07); the impact slow-motion is off by default and looks choppy.** In real offline matches every field the mod needs read correctly, health writes were kept and the game honoured extra hit freeze frames. The rules are tested against a fake match and a fake REFramework (124 tests).
 
 ## What it adds
 
@@ -14,7 +14,7 @@ Tekken-style mechanics for **Street Fighter 6**, for **offline play at home** (l
 | Heat start heal | Starting Heat wins back half of your recoverable health (an estimate), like Tekken's Engager | built, untested in game |
 | Heat Smash (stand-in) | Press the Heat key again while in Heat to arm it for 2 seconds. Your next hit deals 15% of max health extra and uses up your Heat. If it doesn't land in time, the Heat is spent anyway. A block doesn't use it up | built, untested in game. Not the real move: no animation or armor |
 | Rage Art (stand-in) | While in Rage, press **F3** (P2 **F4**), once per round. Your next hit within 2 seconds deals 18% of max health extra, removes the opponent's recoverable health, wins back some of yours and ends your Rage. If it misses, Rage still ends | built, untested in game. Not the real move: no cinematic |
-| On-screen readout | Heat bar, Rage and recoverable health for both fighters, from the mod itself | built, untested in game |
+| Heat gauge (on-screen) | A Tekken 8 style gauge under each health bar, drawn by the mod: an orange bar that drains over Heat's 10 seconds with the seconds left shown, pale blue while the timer is paused, flashing red under 25%, a thin outline labelled HEAT when Heat is available, a thin recoverable-health bar, and RAGE / HEAT SMASH ARMED / RAGE ART ARMED labels. Position and size are sliders in the panel and are saved | built, untested in game. The default position was chosen from a screenshot at 1911x1105; other resolutions are untested |
 | Impact slow-motion | When a Heat Smash or Rage Art lands, the game slows to 50% for about half a second | experimental, **off by default**. Only the frame cap method visibly slowed SF6 in testing (it looks choppy, since it lowers the frame rate). Speed and length can be changed live in the panel |
 | Hit freeze boost (weightier hits) | When a hit lands, adds 3 frames to the game's `hit_stop` counter on both fighters (10 when a Heat Smash or Rage Art lands) | **on by default**: the user tried it offline and said it feels good. Sizes adjustable live in the panel |
 | Juggle scaling | Longer air combos | research only, not built |
